@@ -1,0 +1,7 @@
+# Fichiers produits (publiés dans les « Releases » GitHub, pas dans le dépôt)
+target/
+dist/
+
+# Systèmes
+.DS_Store
+Thumbs.db

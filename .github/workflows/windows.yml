@@ -1,0 +1,52 @@
+# Construit l'installateur Windows sur les serveurs de GitHub :
+#  - à chaque envoi sur main : vérification de la compilation (installateur téléchargeable dans l'onglet Actions) ;
+#  - à chaque publication d'une version (Release) : l'installateur et son empreinte SHA-256 y sont ajoutés.
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  installateur:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust (stable, MSVC)
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Compilation et contrôles (chemins, identifiants, Runtime Visual C++)
+        run: ./tools/release.ps1 -Out dist -Ci
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pomme-Setup
+          path: dist/*
+
+      - name: Ajout à la version publiée
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/Pomme-Setup.exe dist/SHA256SUMS.txt --clobber

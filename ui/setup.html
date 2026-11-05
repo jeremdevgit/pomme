@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Pomme</title>
+<style>
+:root { --text: #f3f5fb; --soft: #d0d6e6; --line: rgba(255,255,255,.14); --accent: #fa2d62; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 14.5px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--text); background: rgba(10, 11, 18, .66); display: flex; flex-direction: column; user-select: none; overflow: hidden; }
+body.opaque { background: #0e0f18; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(60% 45% at 10% 0%, rgba(250,45,98,.28), transparent 70%), radial-gradient(60% 55% at 100% 100%, rgba(140,92,255,.26), transparent 70%); }
+header { display: flex; align-items: center; gap: 14px; padding: 22px 26px 6px; }
+header svg { width: 52px; height: 52px; }
+h1 { margin: 0; font: 700 26px "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+.sub { color: var(--soft); font-size: 13px; }
+main { flex: 1; overflow-y: auto; padding: 12px 26px; }
+.box { padding: 14px 16px; border-radius: 16px; margin-bottom: 12px; background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.035)); border: 1px solid var(--line); }
+.box h2 { margin: 0 0 10px; font-size: 11.5px; letter-spacing: .07em; text-transform: uppercase; color: #b9c1d6; }
+.note { color: var(--soft); font-size: 13.5px; margin-top: 6px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+input[type=text] { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--text); font: inherit; outline: none; }
+input[type=text]:focus { border-color: rgba(250,45,98,.7); }
+.toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin-right: 18px; padding: 4px 0; }
+.toggle i { width: 40px; height: 23px; border-radius: 12px; background: rgba(255,255,255,.2); position: relative; transition: background .15s; flex: none; }
+.toggle i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.toggle.on i { background: var(--accent); }
+.toggle.on i::after { transform: translateX(17px); }
+.chip { padding: 7px 13px; border-radius: 17px; border: 1px solid var(--line); background: rgba(255,255,255,.06); cursor: pointer; }
+.chip.on { background: rgba(250,45,98,.25); border-color: rgba(250,45,98,.6); }
+.choice { display: flex; gap: 14px; align-items: center; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.04); margin-bottom: 8px; cursor: pointer; }
+.choice:hover { background: rgba(255,255,255,.08); }
+.choice.on { background: rgba(250,45,98,.18); border-color: rgba(250,45,98,.55); }
+.choice .dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #cfd5e5; flex: none; position: relative; }
+.choice.on .dot::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: #fff; }
+.choice b { display: block; font-size: 15.5px; }
+.choice span { color: var(--soft); font-size: 13.5px; }
+footer { display: flex; align-items: center; gap: 10px; padding: 14px 26px 20px; }
+footer .grow { flex: 1; color: #b9c1d6; font-size: 12.5px; }
+button { font: inherit; cursor: pointer; border: 0; border-radius: 12px; padding: 11px 22px; color: #fff; }
+.primary { min-width: 170px; font-weight: 700; font-size: 15.5px; background: linear-gradient(135deg, #ff3b6e, #f0306a 45%, #9b5cff); box-shadow: 0 8px 26px rgba(250,45,98,.45), inset 0 1px 0 rgba(255,255,255,.35); }
+.primary:hover { filter: brightness(1.12); }
+.secondary { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); font-weight: 600; }
+.secondary:hover { background: rgba(255,255,255,.22); }
+.small { padding: 8px 14px; border-radius: 10px; }
+.center { text-align: center; padding: 40px 10px; }
+.spinner { width: 34px; height: 34px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid rgba(255,255,255,.18); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ok { color: #4ce6a0; font-size: 21px; font-weight: 700; }
+.err { color: #ff8080; font-size: 19px; font-weight: 700; }
+.warn { color: #ffcc66; font-size: 13.5px; margin-top: 4px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <svg viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff3d73"/><stop offset=".5" stop-color="#f24dd9"/><stop offset="1" stop-color="#7c5cff"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="15" fill="#15162a" stroke="rgba(255,255,255,.3)"/><path d="M32 22c-3-3-13-4-15 6-2 9 4 22 10 22 2 0 3-1 5-1s3 1 5 1c6 0 12-13 10-22-2-10-12-9-15-6z" fill="url(#g)"/><path d="M33 21c1-5 5-8 9-8-1 5-5 8-9 8z" fill="#42e68c"/></svg>
+  <div><h1 id="title">Installer Pomme</h1><div class="sub" id="version"></div></div>
+</header>
+<main id="main"></main>
+<footer id="foot"></footer>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const send = (cmd, d = {}) => window.ipc.postMessage(JSON.stringify({ cmd, ...d }));
+const S = { mode: 'setup', opts: {}, task: 'repair', existing: false, uninstalled: false };
+
+function toggle(key, label) { return `<span class="toggle${S.opts[key] ? ' on' : ''}" data-k="${key}"><i></i>${label}</span>`; }
+
+function renderSetup() {
+  $('#title').textContent = S.existing ? 'Mettre à jour Pomme' : 'Installer Pomme';
+  $('#main').innerHTML = `
+    <div class="box"><h2>Dossier d'installation</h2>
+      <div class="row"><input type="text" id="dir" value="${esc(S.opts.dir)}" spellcheck="false"><button class="secondary small" id="browse">Parcourir…</button></div>
+      <div class="note">Pomme s'installe pour votre compte Windows : aucun droit administrateur n'est nécessaire.</div>
+      <div class="warn" id="dir-err" hidden></div>
+      ${S.existing ? `<div class="note">La version ${esc(S.existingVersion || 'précédente')} déjà installée sera remplacée. Votre bibliothèque, vos réglages et votre connexion Apple Music sont conservés.</div>` : ''}</div>
+    <div class="box"><h2>Raccourcis</h2>
+      <div class="row">${toggle('desktop', 'Bureau')}${toggle('startMenu', 'Menu Démarrer')}</div>
+      <div class="note">Barre des tâches : Windows réserve l'épinglage à l'utilisateur. Une fois installé, clic droit sur Pomme dans le menu Démarrer › Épingler à la barre des tâches.</div></div>
+    <div class="box"><h2>Démarrage et fermeture</h2>
+      <div class="row">${toggle('autostart', 'Lancer Pomme au démarrage du PC')}</div>
+      <div class="row" style="margin-top:8px"><span>Bouton fermer :</span><span class="chip${S.opts.closeToTray ? ' on' : ''}" data-tray="1">Garder la musique dans la zone de notification</span><span class="chip${!S.opts.closeToTray ? ' on' : ''}" data-tray="0">Quitter Pomme</span></div>
+      <div class="note">Modifiable à tout moment dans les Réglages de Pomme.</div></div>
+    <div class="box"><h2>À savoir</h2>
+      <div class="note" style="margin:0">Pomme lit votre musique locale et, avec un abonnement, Apple Music. Pomme n'est ni affilié ni approuvé par Apple. Logiciel libre (GPL-3.0) créé par <b>jeremdevgit</b> : ses autres logiciels sont sur github.com/jeremdevgit.</div></div>`;
+  $('#foot').innerHTML = `<span class="grow">Version ${esc(S.version)}</span><button class="secondary" id="cancel">Annuler</button><button class="primary" id="go">${S.existing ? 'Mettre à jour' : 'Installer'}</button>`;
+  document.querySelectorAll('.toggle').forEach(t => t.onclick = () => { S.opts[t.dataset.k] = !S.opts[t.dataset.k]; S.opts.dir = $('#dir').value; renderSetup(); });
+  document.querySelectorAll('[data-tray]').forEach(c => c.onclick = () => { S.opts.closeToTray = c.dataset.tray === '1'; S.opts.dir = $('#dir').value; renderSetup(); });
+  $('#browse').onclick = () => send('browse');
+  $('#cancel').onclick = () => send('close');
+  $('#go').onclick = () => { S.opts.dir = $('#dir').value; run('install'); };
+}
+
+function renderMaintenance() {
+  $('#title').textContent = 'Gérer Pomme';
+  const c = (t, title, sub) => `<div class="choice${S.task === t ? ' on' : ''}" data-t="${t}"><div class="dot"></div><div><b>${title}</b><span>${sub}</span></div></div>`;
+  $('#main').innerHTML = `<div class="box"><h2>Que voulez-vous faire ?</h2>
+    ${c('repair', 'Réparer Pomme', 'Restaure les fichiers et les raccourcis. Votre bibliothèque et vos réglages sont gardés.')}
+    ${c('uninstall', 'Désinstaller l\'application', 'Supprime Pomme mais garde votre bibliothèque, vos réglages et votre connexion Apple Music.')}
+    ${c('uninstall-all', 'Tout désinstaller', 'Supprime Pomme et tout ce qu\'il a créé : bibliothèque, réglages, connexion Apple Music, cache.')}
+    </div><div class="note">Vos fichiers de musique ne sont jamais supprimés : Pomme ne fait que les lire.</div>`;
+  $('#foot').innerHTML = `<span class="grow">Version ${esc(S.version)}</span><button class="secondary" id="cancel">Annuler</button><button class="primary" id="go">${S.task === 'repair' ? 'Réparer' : 'Désinstaller'}</button>`;
+  document.querySelectorAll('.choice').forEach(x => x.onclick = () => { S.task = x.dataset.t; renderMaintenance(); });
+  $('#cancel').onclick = () => send('close');
+  $('#go').onclick = () => run(S.task);
+}
+
+function run(task) {
+  S.task = task;
+  $('#main').innerHTML = `<div class="center"><div class="spinner"></div><div id="step" style="font-size:15.5px">Préparation…</div></div>`;
+  $('#foot').innerHTML = '';
+  send('run', { task, opts: S.opts });
+}
+
+function done(m) {
+  const uninstall = S.task.startsWith('uninstall');
+  if (!m.ok) {
+    $('#main').innerHTML = `<div class="box"><div class="err">L'opération n'a pas abouti</div><div class="note">${esc(m.error)}</div></div>`;
+    $('#foot').innerHTML = `<span class="grow"></span><button class="secondary" id="cancel">Fermer</button><button class="primary" id="retry">Réessayer</button>`;
+    $('#cancel').onclick = () => send('close');
+    $('#retry').onclick = () => (S.mode === 'setup' ? renderSetup() : renderMaintenance());
+    return;
+  }
+  const title = { install: 'Pomme est installé ✔', repair: 'Pomme est réparé ✔', uninstall: 'Pomme est désinstallé ✔', 'uninstall-all': 'Pomme et ses données sont supprimés ✔' }[S.task];
+  let html = `<div class="box"><div class="ok">${title}</div>`;
+  if (S.task === 'uninstall') html += `<div class="note">Votre bibliothèque, vos réglages et votre connexion sont conservés pour une prochaine installation.</div>`;
+  if (!uninstall) html += `<div class="note">Pour l'épingler : clic droit sur Pomme dans le menu Démarrer › Épingler à la barre des tâches.</div>`;
+  for (const n of m.notes || []) html += `<div class="warn">⚠ ${esc(n)}</div>`;
+  if (!uninstall) html += `<div class="row" style="margin-top:12px"><span class="toggle on" id="launch"><i></i>Lancer Pomme maintenant</span></div>`;
+  $('#main').innerHTML = html + '</div>';
+  $('#foot').innerHTML = `<span class="grow"></span><button class="primary" id="finish">Terminer</button>`;
+  $('#launch')?.addEventListener('click', e => e.currentTarget.classList.toggle('on'));
+  $('#finish').onclick = () => { if (!uninstall && $('#launch')?.classList.contains('on')) send('launch'); send('close'); };
+}
+
+window.setup = {
+  recv(m) {
+    if (m.type === 'init') {
+      Object.assign(S, m);
+      if (!m.glass) document.body.classList.add('opaque');
+      $('#version').textContent = 'Lecteur Apple Music et musique locale · version ' + m.version;
+      S.mode === 'setup' ? renderSetup() : renderMaintenance();
+    } else if (m.type === 'dir') { S.opts.dir = m.dir; $('#dir').value = m.dir; }
+    else if (m.type === 'step') { const s = $('#step'); if (s) s.textContent = m.text; }
+    else if (m.type === 'done') done(m);
+  },
+};
+send('init');
+</script>
+</body>
+</html>
