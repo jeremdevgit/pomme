@@ -52,11 +52,13 @@ const ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
 const ICON_PAUSE = '<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>';
 let toastTimer = 0;
 function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  const t = $('#toast'); t.textContent = trad(String(msg)); t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
 }
 
 // ── Apple Music ─────────────────────────────────────────────────────────
+/** Message d'erreur du moteur natif (« Fichier illisible : détail ») : traduit, détail conservé. */
+const tradErr = m => { m = String(m || ''); const i = m.indexOf(' : '); return i > 0 && trad(m) === m ? trad(m.slice(0, i)) + trad(' : ') + m.slice(i + 3) : trad(m); };
 const apple = { music: null, token: null, sf: 'fr', ok: false, authorized: false, cache: new Map(), playlists: [] };
 
 /** Clé du lecteur web d'Apple : relue sur music.apple.com puis gardée tant
@@ -138,9 +140,9 @@ async function onAuth() {
 
 function updateAccount() {
   const b = $('#account');
-  $('#account-label').textContent = !apple.ok ? 'Apple Music indisponible' : apple.authorized ? 'Apple Music' : 'Se connecter';
+  $('#account-label').textContent = trad(!apple.ok ? 'Apple Music indisponible' : apple.authorized ? 'Apple Music' : 'Se connecter');
   b.classList.toggle('on', apple.authorized);
-  b.title = apple.authorized ? 'Connecté à Apple Music — cliquer pour se déconnecter' : 'Se connecter à Apple Music';
+  b.title = trad(apple.authorized ? 'Connecté à Apple Music — cliquer pour se déconnecter' : 'Se connecter à Apple Music');
 }
 
 async function signIn(e) {
@@ -167,7 +169,7 @@ async function api(path, { method = 'GET', body, cache = method === 'GET' } = {}
   if (apple.music?.musicUserToken) headers['Music-User-Token'] = apple.music.musicUserToken;
   if (body) headers['Content-Type'] = 'application/json';
   const sep = path.includes('?') ? '&' : '?';
-  const url = 'https://amp-api.music.apple.com' + path + (!/[?&]l=/.test(path) ? sep + 'l=' + encodeURIComponent(navigator.language || 'fr-FR') : '');
+  const url = 'https://amp-api.music.apple.com' + path + (!/[?&]l=/.test(path) ? sep + 'l=' + encodeURIComponent(LOCALE || navigator.language || 'fr-FR') : '');
   // compte : jamais le cache HTTP du moteur web (il gardait la 404 d'une playlist
   // vide, et les morceaux ajoutés ensuite restaient invisibles) ; Pomme a le sien
   const fetchCache = path.startsWith('/v1/me/') ? 'no-store' : 'default';
@@ -291,7 +293,7 @@ const player = {
         // on relance, au pire avec le seul morceau choisi.
         const next = attempt < 2 && unresolved(desc, msg, attempt);
         if (next) { desc = next; continue; }
-        return toast(/resolv|not found|unavailable/i.test(msg) ? 'Ce morceau n\'est pas disponible sur Apple Music' : 'Lecture impossible : ' + msg);
+        return toast(/resolv|not found|unavailable/i.test(msg) ? trad("Ce morceau n'est pas disponible sur Apple Music") : trad('Lecture impossible : {e}', { e: msg }));
       }
     }
   },
@@ -320,7 +322,7 @@ const player = {
     try {
       if (this.src === 'apple') { apple.music.isPlaying ? await apple.music.pause() : await apple.music.play(); }
       else if (this.src === 'local') native(this.playing ? 'audio.pause' : 'audio.play');
-    } catch (e) { if (!isAbort(e)) toast(e.message || String(e)); }
+    } catch (e) { if (!isAbort(e)) toast(tradErr(e.message || String(e))); }
   },
   pause() { if (this.playing) this.toggle(); },
   async next() {
@@ -444,7 +446,7 @@ const output = {
     this.name = name; store.set('device', name);
     native('audio.device', { name });
     await this.apply(true);
-    toast(name ? 'Sortie audio : ' + name : 'Sortie par défaut de Windows');
+    toast(name ? trad('Sortie audio : {nom}', { nom: name }) : 'Sortie par défaut de Windows');
     if (router.view === 'settings') router.render();
   },
   /** Menu de la barre de lecture : liste rafraîchie à chaque ouverture. */
@@ -457,7 +459,7 @@ const output = {
     const pos = this.pendingMenu; this.pendingMenu = null;
     if (!pos) return;
     const mark = n => (n === this.name ? '✓ ' : '   ');
-    menu.show(pos, [[mark('') + 'Sortie par défaut de Windows', () => this.set('')], ...app.devices.map(d => [mark(d) + d, () => this.set(d)])]);
+    menu.show(pos, [[mark('') + trad('Sortie par défaut de Windows'), () => this.set('')], ...app.devices.map(d => [mark(d) + d, () => this.set(d)])]);
   },
 };
 // toute lecture du lecteur d'Apple part vers la sortie choisie
@@ -474,8 +476,8 @@ const sleep = {
   timer: 0, endOfTrack: false, until: 0,
   set(min) {
     clearTimeout(this.timer); this.endOfTrack = false; this.until = 0;
-    if (min === 'end') { this.endOfTrack = true; toast('La lecture s\'arrêtera à la fin du morceau'); }
-    else if (min > 0) { this.until = Date.now() + min * 60000; this.timer = setTimeout(() => this.fire(), min * 60000); toast(`La lecture s'arrêtera dans ${min} min`); }
+    if (min === 'end') { this.endOfTrack = true; toast("La lecture s'arrêtera à la fin du morceau"); }
+    else if (min > 0) { this.until = Date.now() + min * 60000; this.timer = setTimeout(() => this.fire(), min * 60000); toast(trad("La lecture s'arrêtera dans {n} min", { n: min })); }
   },
   fire() { this.set(0); player.pause(); toast('Minuterie : lecture arrêtée'); },
 };
@@ -534,7 +536,7 @@ const ui = {
   nowPlaying() {
     const c = player.current();
     const title = c ? c.title : 'Pomme';
-    const sub = c ? [c.artist, c.album].filter(Boolean).join(' — ') : 'Choisissez de la musique';
+    const sub = c ? [c.artist, c.album].filter(Boolean).join(' — ') : trad('Choisissez de la musique');
     $('#np-title').textContent = title; $('#np-sub').textContent = sub;
     $('#np-big-title').textContent = title; $('#np-big-sub').textContent = sub;
     $('#mini-title').textContent = title; $('#mini-sub').textContent = c?.artist || '';
@@ -558,7 +560,7 @@ const ui = {
   },
   playState() {
     for (const i of $$('.play-ico')) i.innerHTML = player.playing ? ICON_PAUSE : ICON_PLAY;
-    for (const b of $$('.play')) b.title = player.playing ? 'Pause' : 'Lecture';
+    for (const b of $$('.play')) b.title = trad(player.playing ? 'Pause' : 'Lecture');
   },
   modes() {
     $('#shuffle').classList.toggle('on', player.shuffle);
@@ -602,7 +604,7 @@ function ambient(src) {
 const fullscreen = {
   tab: store.get('npTab', 'lyrics'),
   open() {
-    if (!player.current()) return toast('Lancez un morceau pour l\'afficher en plein écran');
+    if (!player.current()) return toast("Lancez un morceau pour l'afficher en plein écran");
     $('#np').hidden = false;
     this.renderTab();
     if (panel.view === 'lyrics') panel.render();
@@ -667,7 +669,7 @@ const panel = {
   render() {
     const body = $('#panel-body');
     if (this.view === 'lyrics') {
-      if (fullscreen.on && fullscreen.tab === 'lyrics') body.innerHTML = '<div class="empty">Paroles affichées en plein écran</div>';
+      if (fullscreen.on && fullscreen.tab === 'lyrics') body.innerHTML = `<div class="empty">${trad('Paroles affichées en plein écran')}</div>`;
       else lyrics.render(body);
       return;
     }
@@ -693,7 +695,7 @@ function queueHtml() {
       items.push({ i, cur: i === player.index, title: t?.title, sub: t?.artist, art: t?.art ? 'art/' + t.id : '' });
     }
   }
-  if (!items.length) return '<div class="empty">La file d\'attente est vide</div>';
+  if (!items.length) return `<div class="empty">${trad("La file d'attente est vide")}</div>`;
   return items.map(it => `<div class="qitem${it.cur ? ' cur' : ''}" data-i="${it.i}">${it.art ? img(it.art) : '<div class="ph"></div>'}<div class="c"><div>${esc(it.title)}</div><div class="muted">${esc(it.sub)}</div></div></div>`).join('');
 }
 /** Clic sur un morceau de la file : lecture à cet endroit. */
@@ -763,14 +765,14 @@ const lyrics = {
     const box = this.box;
     if (!box) return;
     this.els = []; this.idx = -1; this.wordState = [];
-    if (!player.current()) { box.innerHTML = '<div class="empty">Lancez un morceau pour voir ses paroles</div>'; return; }
+    if (!player.current()) { box.innerHTML = `<div class="empty">${trad('Lancez un morceau pour voir ses paroles')}</div>`; return; }
     if (this.loading) { box.innerHTML = '<div class="spinner"></div>'; return; }
-    if (!this.data?.lines?.length) { box.innerHTML = '<div class="empty">Paroles indisponibles pour ce morceau</div>'; return; }
+    if (!this.data?.lines?.length) { box.innerHTML = `<div class="empty">${trad('Paroles indisponibles pour ce morceau')}</div>`; return; }
     const d = this.data;
     const words = ws => ws.map(w => `<span class="w">${esc(w.text)}</span>`).join('');
     box.innerHTML = `<div class="lyrics${d.plain ? ' plain' : ''}">` + d.lines.map((l, i) =>
       `<p class="l${l.words ? ' timed' : ''}${l.gap ? ' gap' : ''}" data-i="${i}">${l.words ? words(l.words) : esc(l.text || '♪')}${l.bg?.length ? `<span class="bgv">${words(l.bg)}</span>` : ''}</p>`).join('') +
-      `<div class="src">${this.source ? 'Paroles : ' + esc(this.source) : ''}</div></div>`;
+      `<div class="src">${this.source ? esc(trad('Paroles : {source}', { source: this.source })) : ''}</div></div>`;
     this.els = $$('.lyrics .l', box);
     this.syncNow();
     this.tick();
@@ -929,7 +931,7 @@ function vlist(host, items, row, h = 52) {
 function trackRow(t) {
   const n = document.createElement('div');
   n.className = 'trow';
-  n.innerHTML = `<div class="grip" title="Glisser pour déplacer">⠿</div><div class="art">${img(t.art)}</div><div class="c t">${esc(t.title)}<small>${esc(t.artist)}</small></div><div class="c sub art-c">${esc(t.artist)}</div><div class="c sub alb">${esc(t.album)}</div><div class="fmt">${esc(t.fmt || '')}</div><div class="dur">${fmtTime(t.duration)}</div><button class="act" title="Retirer">✕</button>`;
+  n.innerHTML = `<div class="grip" title="${trad('Glisser pour déplacer')}">⠿</div><div class="art">${img(t.art)}</div><div class="c t">${esc(t.title)}<small>${esc(t.artist)}</small></div><div class="c sub art-c">${esc(t.artist)}</div><div class="c sub alb">${esc(t.album)}</div><div class="fmt">${esc(t.fmt || '')}</div><div class="dur">${fmtTime(t.duration)}</div><button class="act" title="${trad('Retirer')}">✕</button>`;
   const c = player.current();
   if (c && (c.id === t.id || (t.catalogId && c.catalogId === t.catalogId))) n.classList.add('playing');
   return n;
@@ -944,7 +946,7 @@ const localOf = t => ({ id: t.id, title: t.title, artist: t.artist, album: t.alb
 /** Liste de morceaux : en-tête, lignes virtuelles, lecture au double-clic.
  *  `opts.editable` : poignées de déplacement ; `opts.onReorder(items)`. */
 function songTable(host, songs, onPlay, opts = {}) {
-  host.insertAdjacentHTML('beforeend', '<div class="thead"><span></span><span></span><span>Titre</span><span class="art-c">Artiste</span><span class="alb">Album</span><span class="fmt">Format</span><span class="r">Durée</span><span></span></div>');
+  host.insertAdjacentHTML('beforeend', `<div class="thead"><span></span><span></span><span>${trad('Titre')}</span><span class="art-c">${trad('Artiste')}</span><span class="alb">${trad('Album')}</span><span class="fmt">${trad('Format')}</span><span class="r">${trad('Durée')}</span><span></span></div>`);
   const head = host.lastElementChild;
   const box = document.createElement('div');
   host.appendChild(box);
@@ -1056,7 +1058,7 @@ function playItem(type, id) {
 }
 function section(title, items, size) {
   if (!items?.length) return '';
-  return `<div class="section"><h2>${esc(title)}</h2><div class="shelf">${items.slice(0, 24).map(i => card(i, size)).join('')}</div></div>`;
+  return `<div class="section"><h2>${esc(trad(title))}</h2><div class="shelf">${items.slice(0, 24).map(i => card(i, size)).join('')}</div></div>`;
 }
 
 // ── menu contextuel ──────────────────────────────────────────────────────
@@ -1067,7 +1069,7 @@ const menu = {
     this.close();
     const m = document.createElement('div');
     m.className = 'menu';
-    m.innerHTML = items.map((it, i) => `<div class="qitem" data-i="${i}">${esc(it[0])}</div>`).join('');
+    m.innerHTML = items.map((it, i) => `<div class="qitem" data-i="${i}">${esc(trad(it[0]))}</div>`).join('');
     m.addEventListener('click', ev => { const r = ev.target.closest('[data-i]'); if (r) { items[+r.dataset.i][1](); this.close(); } });
     document.body.appendChild(m);
     m.style.left = Math.max(8, Math.min(e.clientX, innerWidth - m.offsetWidth - 8)) + 'px';
@@ -1091,7 +1093,7 @@ const menu = {
       items.push(['J\'aime', () => api(`/v1/me/ratings/songs/${id}`, { method: 'PUT', cache: false, body: { type: 'rating', attributes: { value: 1 } } }).then(() => toast('Ajouté à vos favoris'), () => toast('Échec'))]);
       if (opts.onRemove && opts.index >= 0) items.push(['Retirer de la playlist', () => opts.onRemove(opts.index)]);
       for (const p of apple.playlists.filter(p => p.attributes?.canEdit).slice(0, 15)) {
-        items.push(['➕ ' + p.attributes.name, () => addToPlaylist(p.id, [id]).then(() => toast('Ajouté à « ' + p.attributes.name + ' »'), () => toast('Échec'))]);
+        items.push(['➕ ' + p.attributes.name, () => addToPlaylist(p.id, [id]).then(() => toast(trad('Ajouté à « {nom} »', { nom: p.attributes.name })), () => toast('Échec'))]);
       }
     }
     this.show(e, items);
@@ -1105,7 +1107,7 @@ function ask(title, value = '') {
     menu.close();
     const m = document.createElement('div');
     m.className = 'menu ask';
-    m.innerHTML = `<div class="ask-t">${esc(title)}</div><input class="field" maxlength="100" value="${esc(value)}"><div class="ask-b"><button class="btn" data-a="0">Annuler</button><button class="btn primary" data-a="1">OK</button></div>`;
+    m.innerHTML = `<div class="ask-t">${esc(trad(title))}</div><input class="field" maxlength="100" value="${esc(value)}"><div class="ask-b"><button class="btn" data-a="0">${trad('Annuler')}</button><button class="btn primary" data-a="1">OK</button></div>`;
     document.body.appendChild(m);
     menu.el = m;
     const inp = $('input', m);
@@ -1148,7 +1150,7 @@ const router = {
     const ready = this.view.startsWith('local') || this.view === 'settings' ? null : appleReady;
     Promise.resolve(ready).then(() => live() && fn(v, this.arg, live)).catch(e => {
       log('vue ' + this.view + ' en erreur : ' + (e.message || e));
-      if (live()) v.innerHTML = `<div class="empty"><h2>Impossible de charger cette page</h2><div>${esc(e.message || e)}</div></div>`;
+      if (live()) v.innerHTML = `<div class="empty"><h2>${trad('Impossible de charger cette page')}</h2><div>${esc(e.message || e)}</div></div>`;
     });
   },
   markPlaying() {
@@ -1161,7 +1163,7 @@ const router = {
 };
 
 function needAuth(v) {
-  v.innerHTML = `<div class="empty"><h2>Connectez-vous à Apple Music</h2><div>Votre bibliothèque, vos playlists et les recommandations apparaissent une fois connecté.</div><button class="btn primary" id="signin2">Se connecter</button></div>`;
+  v.innerHTML = `<div class="empty"><h2>${trad('Connectez-vous à Apple Music')}</h2><div>${trad('Votre bibliothèque, vos playlists et les recommandations apparaissent une fois connecté.')}</div><button class="btn primary" id="signin2">${trad('Se connecter')}</button></div>`;
   $('#signin2').onclick = signIn;
 }
 
@@ -1174,7 +1176,7 @@ const views = {
       api(`/v1/me/recent/played?limit=20`).catch(() => ({ data: [] })),
     ]);
     if (!live()) return;
-    let html = '<h1>Écouter maintenant</h1>' + section('Écoutés récemment', recent.data);
+    let html = `<h1>${trad('Écouter maintenant')}</h1>` + section('Écoutés récemment', recent.data);
     const seen = new Set(['Écoutés récemment']);
     for (const r of rec.data || []) {
       const title = r.attributes?.title?.stringForDisplay || 'Pour vous';
@@ -1182,16 +1184,16 @@ const views = {
       seen.add(title);
       html += section(title, r.relationships?.contents?.data);
     }
-    v.innerHTML = html || '<div class="empty">Rien à afficher pour l\'instant</div>';
+    v.innerHTML = html || `<div class="empty">${trad("Rien à afficher pour l'instant")}</div>`;
   },
   async browse(v, _, live, invite) {
     const r = await api(`/v1/catalog/${apple.sf}/charts?types=albums,playlists,songs&limit=24`);
     if (!live()) return;
     const ch = r.results || {};
-    let html = invite ? `<div class="card-box glass" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="flex:1 1 260px"><b>Écoutez Apple Music en entier</b><div class="muted">Connectez-vous avec votre identifiant Apple pour accéder à votre bibliothèque et lire les morceaux complets.</div></div><button class="btn primary" id="signin3">Se connecter</button></div>` : '';
-    html += '<h1>Parcourir</h1>' + section('Albums du moment', ch.albums?.[0]?.data) + section('Playlists populaires', ch.playlists?.[0]?.data);
+    let html = invite ? `<div class="card-box glass" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><div style="flex:1 1 260px"><b>${trad('Écoutez Apple Music en entier')}</b><div class="muted">${trad('Connectez-vous avec votre identifiant Apple pour accéder à votre bibliothèque et lire les morceaux complets.')}</div></div><button class="btn primary" id="signin3">${trad('Se connecter')}</button></div>` : '';
+    html += `<h1>${trad('Parcourir')}</h1>` + section('Albums du moment', ch.albums?.[0]?.data) + section('Playlists populaires', ch.playlists?.[0]?.data);
     v.innerHTML = html;
-    if (ch.songs?.[0]?.data?.length) { v.insertAdjacentHTML('beforeend', '<h2>Top morceaux</h2>'); songTable(v, ch.songs[0].data.map(songOf), playAppleSongs); }
+    if (ch.songs?.[0]?.data?.length) { v.insertAdjacentHTML('beforeend', `<h2>${trad('Top morceaux')}</h2>`); songTable(v, ch.songs[0].data.map(songOf), playAppleSongs); }
     $('#signin3')?.addEventListener('click', signIn);
   },
   async radio(v, _, live) {
@@ -1200,12 +1202,12 @@ const views = {
       apple.authorized ? api(`/v1/catalog/${apple.sf}/stations?filter[identity]=personal`).catch(() => ({ data: [] })) : { data: [] },
     ]);
     if (!live()) return;
-    v.innerHTML = '<h1>Radio</h1>' + section('En direct', liveR.data, 220) + section('Votre station', personal.data, 220);
-    if (!v.querySelector('.card')) v.insertAdjacentHTML('beforeend', '<div class="empty">Aucune radio disponible</div>');
+    v.innerHTML = `<h1>${trad('Radio')}</h1>` + section('En direct', liveR.data, 220) + section('Votre station', personal.data, 220);
+    if (!v.querySelector('.card')) v.insertAdjacentHTML('beforeend', `<div class="empty">${trad('Aucune radio disponible')}</div>`);
   },
   async search(v, q, live) {
     q = (q || '').trim();
-    if (!q) { v.innerHTML = '<div class="empty">Tapez un titre, un artiste ou un album</div>'; return; }
+    if (!q) { v.innerHTML = `<div class="empty">${trad('Tapez un titre, un artiste ou un album')}</div>`; return; }
     const ql = q.toLowerCase();
     const localHits = local.tracks.filter(t => (t.title + ' ' + t.artist + ' ' + t.album).toLowerCase().includes(ql)).slice(0, 300);
     let r = { results: {} }, lib = { results: {} };
@@ -1217,19 +1219,19 @@ const views = {
     const R = r.results || {}, L = lib.results || {};
     v.innerHTML = `<h1>« ${esc(q)} »</h1>` + section('Artistes', R.artists?.data, 150) + section('Albums', R.albums?.data) + section('Playlists', R.playlists?.data) + section('Vos playlists', L['library-playlists']?.data) + section('Radios', R.stations?.data);
     if (R.songs?.data?.length) { v.insertAdjacentHTML('beforeend', '<h2>Morceaux</h2>'); songTable(v, R.songs.data.map(songOf), playAppleSongs); }
-    if (L['library-songs']?.data?.length) { v.insertAdjacentHTML('beforeend', '<h2>Dans votre bibliothèque</h2>'); songTable(v, L['library-songs'].data.map(songOf), playAppleSongs); }
-    if (localHits.length) { v.insertAdjacentHTML('beforeend', '<h2>Sur cet ordinateur</h2>'); songTable(v, localHits.map(localOf), playLocalSongs); }
-    if (!v.querySelector('.card, .tracks')) v.insertAdjacentHTML('beforeend', '<div class="empty">Aucun résultat</div>');
+    if (L['library-songs']?.data?.length) { v.insertAdjacentHTML('beforeend', `<h2>${trad('Dans votre bibliothèque')}</h2>`); songTable(v, L['library-songs'].data.map(songOf), playAppleSongs); }
+    if (localHits.length) { v.insertAdjacentHTML('beforeend', `<h2>${trad('Sur cet ordinateur')}</h2>`); songTable(v, localHits.map(localOf), playLocalSongs); }
+    if (!v.querySelector('.card, .tracks')) v.insertAdjacentHTML('beforeend', `<div class="empty">${trad('Aucun résultat')}</div>`);
   },
   async recent(v, _, live) {
     if (!apple.authorized) return needAuth(v);
     const r = await api('/v1/me/library/recently-added?limit=25');
     if (!live()) return;
-    v.innerHTML = `<h1>Ajouts récents</h1><div class="grid">${(r.data || []).map(i => card(i)).join('')}</div>`;
+    v.innerHTML = `<h1>${trad('Ajouts récents')}</h1><div class="grid">${(r.data || []).map(i => card(i)).join('')}</div>`;
   },
   async albums(v, _, live) {
     if (!apple.authorized) return needAuth(v);
-    v.innerHTML = '<h1>Albums</h1><div class="grid" id="g"></div>';
+    v.innerHTML = `<h1>${trad('Albums')}</h1><div class="grid" id="g"></div>`;
     const g = $('#g', v);
     let shown = 0;
     await apiAll('/v1/me/library/albums?limit=100', all => {
@@ -1239,7 +1241,7 @@ const views = {
   },
   async artists(v, _, live) {
     if (!apple.authorized) return needAuth(v);
-    v.innerHTML = '<h1>Artistes</h1><div class="grid" id="g"></div>';
+    v.innerHTML = `<h1>${trad('Artistes')}</h1><div class="grid" id="g"></div>`;
     const g = $('#g', v);
     let shown = 0;
     await apiAll('/v1/me/library/artists?limit=100&include=catalog', all => {
@@ -1253,7 +1255,7 @@ const views = {
   },
   async songs(v, _, live) {
     if (!apple.authorized) return needAuth(v);
-    v.innerHTML = '<div class="row-head"><h1>Morceaux</h1><span class="muted" id="cnt"></span><button class="btn" id="sh">Aléatoire</button></div>';
+    v.innerHTML = `<div class="row-head"><h1>${trad('Morceaux')}</h1><span class="muted" id="cnt"></span><button class="btn" id="sh">${trad('Aléatoire')}</button></div>`;
     let list = null;
     $('#sh').onclick = () => { if (list?.items.length) playAppleSongs(shuffled(list.items), 0); };
     const s = [];
@@ -1262,7 +1264,7 @@ const views = {
       // seules les nouvelles pages sont converties
       for (let k = s.length; k < all.length; k++) s.push(songOf(all[k]));
       if (!list) list = songTable(v, s, playAppleSongs); else list.update(s);
-      $('#cnt').textContent = all.length + ' morceaux';
+      $('#cnt').textContent = tradn(all.length, '{n} morceau', '{n} morceaux');
     }, 20000);
   },
   async album(v, id, live) {
@@ -1271,7 +1273,7 @@ const views = {
     if (!live()) return;
     const al = r.data?.[0]; const a = al?.attributes || {};
     const tracks = al?.relationships?.tracks?.data || [];
-    v.innerHTML = `<div class="hero"><div class="cover">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">Album</div><h1>${esc(a.name)}</h1><div>${esc(a.artistName)}</div><div class="muted">${esc([a.genreNames?.[0], (a.releaseDate || '').slice(0, 4), tracks.length + ' morceaux'].filter(Boolean).join(' · '))}</div><div class="actions"><button class="btn primary" id="pa">▶ Lecture</button><button class="btn" id="sh">Aléatoire</button>${apple.authorized && !lib ? '<button class="btn" id="add">＋ Bibliothèque</button>' : ''}</div></div></div>`;
+    v.innerHTML = `<div class="hero"><div class="cover">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">${trad('Album')}</div><h1>${esc(a.name)}</h1><div>${esc(a.artistName)}</div><div class="muted">${esc([a.genreNames?.[0], (a.releaseDate || '').slice(0, 4), tradn(tracks.length, '{n} morceau', '{n} morceaux')].filter(Boolean).join(' · '))}</div><div class="actions"><button class="btn primary" id="pa">▶ ${trad('Lecture')}</button><button class="btn" id="sh">${trad('Aléatoire')}</button>${apple.authorized && !lib ? `<button class="btn" id="add">＋ ${trad('Bibliothèque')}</button>` : ''}</div></div></div>`;
     songTable(v, tracks.map(songOf), (items, i) => player.playApple({ album: id, startWith: i, startPosition: i }));
     $('#pa').onclick = () => player.playApple({ album: id });
     $('#sh').onclick = () => tracks.length ? playAppleSongs(shuffled(tracks.map(songOf)), 0) : player.playApple({ album: id });
@@ -1282,17 +1284,17 @@ const views = {
     const r = await api(`/v1/catalog/${apple.sf}/artists/${id}?views=top-songs,full-albums,singles,similar-artists,latest-release`);
     if (!live()) return;
     const ar = r.data?.[0]; const a = ar?.attributes || {}; const vw = ar?.views || {};
-    v.innerHTML = `<div class="hero"><div class="cover round">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">Artiste</div><h1>${esc(a.name)}</h1><div class="muted">${esc(a.genreNames?.join(', ') || '')}</div><div class="actions"><button class="btn primary" id="pa">▶ Top morceaux</button></div></div></div>`;
+    v.innerHTML = `<div class="hero"><div class="cover round">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">${trad('Artiste')}</div><h1>${esc(a.name)}</h1><div class="muted">${esc(a.genreNames?.join(', ') || '')}</div><div class="actions"><button class="btn primary" id="pa">▶ ${trad('Top morceaux')}</button></div></div></div>`;
     const top = (vw['top-songs']?.data || []).map(songOf);
     $('#pa').onclick = () => top.length && playAppleSongs(top, 0);
-    if (top.length) { v.insertAdjacentHTML('beforeend', '<h2>Top morceaux</h2>'); songTable(v, top.slice(0, 10), playAppleSongs); }
+    if (top.length) { v.insertAdjacentHTML('beforeend', `<h2>${trad('Top morceaux')}</h2>`); songTable(v, top.slice(0, 10), playAppleSongs); }
     v.insertAdjacentHTML('beforeend', section('Dernière sortie', vw['latest-release']?.data) + section('Albums', vw['full-albums']?.data) + section('Singles et EP', vw.singles?.data) + section('Artistes similaires', vw['similar-artists']?.data, 150));
   },
 
   // musique locale
   'local-songs'(v) {
     if (!local.tracks.length) return localEmpty(v);
-    v.innerHTML = `<div class="row-head"><h1>Morceaux</h1><span class="muted">${local.tracks.length} morceaux</span><button class="btn" id="sh">Aléatoire</button></div>`;
+    v.innerHTML = `<div class="row-head"><h1>${trad('Morceaux')}</h1><span class="muted">${tradn(local.tracks.length, '{n} morceau', '{n} morceaux')}</span><button class="btn" id="sh">${trad('Aléatoire')}</button></div>`;
     const items = local.tracks.map(localOf);
     songTable(v, items, playLocalSongs);
     $('#sh').onclick = () => playLocalSongs(shuffled(items), 0);
@@ -1301,13 +1303,13 @@ const views = {
     if (!local.tracks.length) return localEmpty(v);
     const albums = new Map();
     for (const t of local.tracks) { const k = (t.album_artist || '') + '\u0001' + (t.album || ''); if (!albums.has(k)) albums.set(k, t); }
-    v.innerHTML = `<h1>${esc(title || 'Albums')}</h1><div class="grid">${[...albums].map(([k, t]) => `<div class="card" data-key="${esc(k)}"><div class="art">${t.art ? img('art/' + t.id) : ''}</div><div class="t">${esc(t.album || 'Sans album')}</div><div class="s">${esc(t.album_artist || t.artist)}</div></div>`).join('')}</div>`;
+    v.innerHTML = `<h1>${esc(trad(title || 'Albums'))}</h1><div class="grid">${[...albums].map(([k, t]) => `<div class="card" data-key="${esc(k)}"><div class="art">${t.art ? img('art/' + t.id) : ''}</div><div class="t">${esc(t.album || trad('Sans album'))}</div><div class="s">${esc(t.album_artist || t.artist)}</div></div>`).join('')}</div>`;
   },
   'local-artists'(v) {
     if (!local.tracks.length) return localEmpty(v);
-    const artists = [...new Set(local.tracks.map(t => t.album_artist || t.artist || 'Artiste inconnu'))].sort((a, b) => a.localeCompare(b));
+    const artists = [...new Set(local.tracks.map(t => t.album_artist || t.artist || trad('Artiste inconnu')))].sort((a, b) => a.localeCompare(b, LOCALE));
     const photos = store.get('artistPhotos', {});
-    v.innerHTML = `<h1>Artistes</h1><div class="grid">${artists.map(a => `<div class="card round" data-name="${esc(a)}">${artistArt(a, photos[a])}<div class="t">${esc(a)}</div></div>`).join('')}</div>`;
+    v.innerHTML = `<h1>${trad('Artistes')}</h1><div class="grid">${artists.map(a => `<div class="card round" data-name="${esc(a)}">${artistArt(a, photos[a])}<div class="t">${esc(a)}</div></div>`).join('')}</div>`;
     artistPhotos(v, photos);
   },
   'local-album'(v, key) {
@@ -1316,7 +1318,7 @@ const views = {
     const t0 = tracks[0];
     if (!t0) return router.go('local-albums');
     const items = tracks.map(localOf);
-    v.innerHTML = `<div class="hero"><div class="cover">${t0.art ? img('art/' + t0.id) : ''}</div><div class="info"><div class="muted">Album · sur cet ordinateur</div><h1>${esc(al || 'Sans album')}</h1><div>${esc(aa || t0.artist)}</div><div class="muted">${esc([t0.genre, t0.year || '', tracks.length + ' morceaux', t0.lossless ? 'Lossless' : t0.format].filter(Boolean).join(' · '))}</div><div class="actions"><button class="btn primary" id="pa">▶ Lecture</button><button class="btn" id="sh">Aléatoire</button></div></div></div>`;
+    v.innerHTML = `<div class="hero"><div class="cover">${t0.art ? img('art/' + t0.id) : ''}</div><div class="info"><div class="muted">${trad('Album · sur cet ordinateur')}</div><h1>${esc(al || trad('Sans album'))}</h1><div>${esc(aa || t0.artist)}</div><div class="muted">${esc([t0.genre, t0.year || '', tradn(tracks.length, '{n} morceau', '{n} morceaux'), t0.lossless ? 'Lossless' : t0.format].filter(Boolean).join(' · '))}</div><div class="actions"><button class="btn primary" id="pa">▶ ${trad('Lecture')}</button><button class="btn" id="sh">${trad('Aléatoire')}</button></div></div></div>`;
     songTable(v, items, playLocalSongs);
     $('#pa').onclick = () => playLocalSongs(items, 0);
     $('#sh').onclick = () => playLocalSongs(shuffled(items), 0);
@@ -1353,7 +1355,7 @@ function artistPhotos(v, photos) {
 }
 
 function localEmpty(v) {
-  v.innerHTML = `<div class="empty"><h2>Ajoutez votre musique</h2><div>Choisissez les dossiers où se trouvent vos fichiers (FLAC, ALAC, WAV, AIFF, MP3, AAC, Vorbis…),<br>ou glissez des fichiers et dossiers dans la fenêtre. Ils restent sur votre ordinateur.</div><button class="btn primary" id="addf">Choisir un dossier</button>${local.scanning ? '<div class="spinner"></div>' : ''}</div>`;
+  v.innerHTML = `<div class="empty"><h2>${trad('Ajoutez votre musique')}</h2><div>${trad('Choisissez les dossiers où se trouvent vos fichiers (FLAC, ALAC, WAV, AIFF, MP3, AAC, Vorbis…),<br>ou glissez des fichiers et dossiers dans la fenêtre. Ils restent sur votre ordinateur.')}</div><button class="btn primary" id="addf">${trad('Choisir un dossier')}</button>${local.scanning ? '<div class="spinner"></div>' : ''}</div>`;
   $('#addf').onclick = () => native('local.addFolder');
 }
 
@@ -1364,7 +1366,7 @@ async function loadPlaylists() {
   try {
     const all = await apiAll('/v1/me/library/playlists?limit=100', () => { }, 1000);
     apple.playlists = all;
-    box.innerHTML = `<a id="newpl"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span class="label">Nouvelle playlist</span></a>` + all.map(p => `<a data-pl="${esc(p.id)}" title="${esc(p.attributes?.name)}"><span class="pl-ic">${p.attributes?.artwork ? img(artUrl(p.attributes.artwork, 22)) : PL_ICON}</span><span class="label">${esc(p.attributes?.name)}</span></a>`).join('');
+    box.innerHTML = `<a id="newpl"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span class="label">${trad('Nouvelle playlist')}</span></a>` + all.map(p => `<a data-pl="${esc(p.id)}" title="${esc(p.attributes?.name)}"><span class="pl-ic">${p.attributes?.artwork ? img(artUrl(p.attributes.artwork, 22)) : PL_ICON}</span><span class="label">${esc(p.attributes?.name)}</span></a>`).join('');
   } catch { box.innerHTML = ''; }
 }
 
@@ -1375,11 +1377,11 @@ async function playlistView(v, id, live) {
   if (!live()) return;
   const pl = r.data?.[0]; const a = pl?.attributes || {};
   const editable = lib && a.canEdit !== false && apple.authorized;
-  v.innerHTML = `<div class="hero"><div class="cover">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">Playlist</div><h1 id="pl-name">${esc(a.name)}</h1><div class="muted">${esc(a.curatorName || a.description?.standard || '')}</div><div class="muted" id="pl-count"></div><div class="actions"><button class="btn primary" id="pa">▶ Lecture</button><button class="btn" id="sh">Aléatoire</button>${editable ? '<button class="btn" id="ed">✎ Modifier</button>' : ''}</div></div></div><div id="pl-edit"></div><div id="pl-list"></div><div id="pl-sugg"></div>`;
+  v.innerHTML = `<div class="hero"><div class="cover">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">${trad('Playlist')}</div><h1 id="pl-name">${esc(a.name)}</h1><div class="muted">${esc(a.curatorName || a.description?.standard || '')}</div><div class="muted" id="pl-count"></div><div class="actions"><button class="btn primary" id="pa">▶ ${trad('Lecture')}</button><button class="btn" id="sh">${trad('Aléatoire')}</button>${editable ? `<button class="btn" id="ed">✎ ${trad('Modifier')}</button>` : ''}</div></div></div><div id="pl-edit"></div><div id="pl-list"></div><div id="pl-sugg"></div>`;
   const play = (items, i) => lib ? playAppleSongs(items, i) : player.playApple({ playlist: id, startWith: i, startPosition: i });
   let list = null, loaded = false;
   const st = { editing: false, name: a.name, added: 0, dirty: false };
-  const count = () => { const d = list?.items.reduce((s, t) => s + (t.duration || 0), 0) || 0; $('#pl-count', v).textContent = `${list?.items.length || 0} morceaux · ${fmtTime(d)}`; };
+  const count = () => { const d = list?.items.reduce((s, t) => s + (t.duration || 0), 0) || 0; $('#pl-count', v).textContent = tradn(list?.items.length || 0, '{n} morceau', '{n} morceaux') + ' · ' + fmtTime(d); };
 
   /** Enregistre : ajouts d'abord (l'API les place à la fin), puis l'ordre complet. */
   const save = async silent => {
@@ -1455,16 +1457,16 @@ async function playlistView(v, id, live) {
     st.editing = !st.editing;
     list.box.classList.toggle('editing', st.editing);
     list.head.classList.toggle('editing', st.editing);
-    $('#ed', v).textContent = st.editing ? '✓ Terminer' : '✎ Modifier';
+    $('#ed', v).textContent = st.editing ? '✓ ' + trad('Terminer') : '✎ ' + trad('Modifier');
     const box = $('#pl-edit', v);
     if (!st.editing) {
       box.innerHTML = '';
       if (st.dirty || st.added || st.name !== a.name) save().catch(() => toast('Enregistrement impossible'));
       return;
     }
-    box.innerHTML = `<div class="editbar glass"><input type="text" id="pl-rename" value="${esc(st.name)}" maxlength="100" title="Nom de la playlist">
-      <div class="grp"><span class="muted">Trier :</span><span class="chip" data-s="title">Titre</span><span class="chip" data-s="artist">Artiste</span><span class="chip" data-s="album">Album</span><span class="chip" data-s="duration">Durée</span><span class="chip" data-s="shuffle">Mélanger</span><span class="chip" data-s="reverse">Inverser</span></div>
-      <input type="search" id="pl-add" placeholder="Ajouter des morceaux : rechercher un titre, un artiste…"></div><div id="pl-results" class="add-results glass" hidden></div>`;
+    box.innerHTML = `<div class="editbar glass"><input type="text" id="pl-rename" value="${esc(st.name)}" maxlength="100" title="${trad('Nom de la playlist')}">
+      <div class="grp"><span class="muted">${trad('Trier :')}</span><span class="chip" data-s="title">${trad('Titre')}</span><span class="chip" data-s="artist">${trad('Artiste')}</span><span class="chip" data-s="album">${trad('Album')}</span><span class="chip" data-s="duration">${trad('Durée')}</span><span class="chip" data-s="shuffle">${trad('Mélanger')}</span><span class="chip" data-s="reverse">${trad('Inverser')}</span></div>
+      <input type="search" id="pl-add" placeholder="${trad('Ajouter des morceaux : rechercher un titre, un artiste…')}"></div><div id="pl-results" class="add-results glass" hidden></div>`;
     $('#pl-rename', v).oninput = e => { st.name = e.target.value.trim() || a.name; };
     box.querySelectorAll('[data-s]').forEach(c => c.onclick = () => {
       const k = c.dataset.s; const it = list.items.slice();
@@ -1485,14 +1487,14 @@ async function playlistView(v, id, live) {
         ]);
         const found = [...(libr.results?.['library-songs']?.data || []), ...(cat.results?.songs?.data || [])].map(songOf);
         res.hidden = false;
-        res.innerHTML = found.length ? found.map((s, i) => `<div class="qitem" data-k="${i}">${s.art ? img(s.art) : '<div class="ph"></div>'}<div class="c"><div>${esc(s.title)}</div><div class="muted">${esc(s.artist)} · ${esc(s.album)}</div></div><button class="btn small">＋ Ajouter</button></div>`).join('') : '<div class="empty" style="padding:16px">Aucun morceau trouvé</div>';
+        res.innerHTML = found.length ? found.map((s, i) => `<div class="qitem" data-k="${i}">${s.art ? img(s.art) : '<div class="ph"></div>'}<div class="c"><div>${esc(s.title)}</div><div class="muted">${esc(s.artist)} · ${esc(s.album)}</div></div><button class="btn small">＋ ${trad('Ajouter')}</button></div>`).join('') : `<div class="empty" style="padding:16px">${trad('Aucun morceau trouvé')}</div>`;
         res.onclick = ev => {
           const row = ev.target.closest('[data-k]'); if (!row) return;
           const s = found[+row.dataset.k];
           st.added++;
           list.update(list.items.concat({ ...s, pending: true, catalogId: s.catalogId || s.id }));
           count();
-          row.querySelector('.btn').textContent = '✓ Ajouté';
+          row.querySelector('.btn').textContent = '✓ ' + trad('Ajouté');
         };
       }, 280);
     };
@@ -1525,7 +1527,7 @@ async function suggestions(v, id, list, count, st) {
     songs = songs.filter(s => !have.has(s.id)).map(songOf);
     const box = $('#pl-sugg', v);
     if (!songs.length || !box?.isConnected) return;
-    box.innerHTML = `<h2>Suggestions</h2><div class="glass add-results">${songs.map((s, i) => `<div class="qitem" data-k="${i}">${s.art ? img(s.art) : '<div class="ph"></div>'}<div class="c"><div>${esc(s.title)}</div><div class="muted">${esc(s.artist)}</div></div><button class="btn small">＋ Ajouter</button></div>`).join('')}</div>`;
+    box.innerHTML = `<h2>${trad('Suggestions')}</h2><div class="glass add-results">${songs.map((s, i) => `<div class="qitem" data-k="${i}">${s.art ? img(s.art) : '<div class="ph"></div>'}<div class="c"><div>${esc(s.title)}</div><div class="muted">${esc(s.artist)}</div></div><button class="btn small">＋ ${trad('Ajouter')}</button></div>`).join('')}</div>`;
     box.onclick = async e => {
       const row = e.target.closest('[data-k]'); if (!row) return;
       const s = songs[+row.dataset.k];
@@ -1537,12 +1539,12 @@ async function suggestions(v, id, list, count, st) {
         st.added++;
         list.update(list.items.concat({ ...s, pending: true, catalogId: s.catalogId || s.id }));
         count();
-        row.querySelector('.btn').textContent = '✓ Ajouté';
+        row.querySelector('.btn').textContent = '✓ ' + trad('Ajouté');
         return;
       }
       try {
         await addToPlaylist(id, [s.id]);
-        row.querySelector('.btn').textContent = '✓ Ajouté';
+        row.querySelector('.btn').textContent = '✓ ' + trad('Ajouté');
         // la liste affichée doit contenir le morceau (sinon un enregistrement suivant l'effacerait)
         for (let tries = 0; tries < 4; tries++) {
           if (tries) await new Promise(r => setTimeout(r, 1200));
@@ -1575,50 +1577,53 @@ const settings = {
   sendEq() { native('audio.eq', { eq: this.eq }); store.set('eq', this.eq); },
   render(v) {
     const eq = this.eq, q = String(store.get('quality', 'auto')), dev = store.get('device', '');
-    const tg = (on, attr, label) => `<span class="toggle${on ? ' on' : ''}" ${attr}><i></i>${label}</span>`;
+    const tg = (on, attr, label) => `<span class="toggle${on ? ' on' : ''}" ${attr}><i></i>${trad(label)}</span>`;
     const sleepLeft = sleep.until ? Math.ceil((sleep.until - Date.now()) / 60000) : 0;
-    v.innerHTML = `<h1>Réglages</h1>
-    <div class="card-box glass"><h2 style="margin-top:0">Qualité de lecture</h2>
-      <div class="muted">Apple Music — le lecteur web d'Apple ne délivre pas de lossless : 256 kb/s est le maximum possible.</div>
-      <div class="chips" style="margin:10px 0 16px"><span class="chip${q === 'auto' ? ' on' : ''}" data-q="auto">Automatique</span><span class="chip${q === '256' ? ' on' : ''}" data-q="256">Haute qualité · AAC 256 kb/s</span><span class="chip${q === '64' ? ' on' : ''}" data-q="64">Économie de données · 64 kb/s</span></div>
-      <div class="muted">Fichiers de l'ordinateur — décodage sans perte (FLAC, ALAC, WAV, AIFF, CAF) jusqu'en 24 bits / 192 kHz.</div>
+    v.innerHTML = `<h1>${trad('Réglages')}</h1>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Langue')}</h2>
+      <div class="row-head" style="gap:10px"><span>${trad("Langue de l'interface")}</span><span data-langues></span></div></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Qualité de lecture')}</h2>
+      <div class="muted">${trad("Apple Music — le lecteur web d'Apple ne délivre pas de lossless : 256 kb/s est le maximum possible.")}</div>
+      <div class="chips" style="margin:10px 0 16px"><span class="chip${q === 'auto' ? ' on' : ''}" data-q="auto">${trad('Automatique')}</span><span class="chip${q === '256' ? ' on' : ''}" data-q="256">${trad('Haute qualité · AAC 256 kb/s')}</span><span class="chip${q === '64' ? ' on' : ''}" data-q="64">${trad('Économie de données · 64 kb/s')}</span></div>
+      <div class="muted">${trad("Fichiers de l'ordinateur — décodage sans perte (FLAC, ALAC, WAV, AIFF, CAF) jusqu'en 24 bits / 192 kHz.")}</div>
       <div class="stack" style="margin-top:10px">
-        <label class="row-head" style="gap:10px"><span>Sortie audio</span><select id="dev"><option value="">Sortie par défaut de Windows</option>${app.devices.map(d => `<option${d === dev ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label class="row-head" style="gap:10px"><span>${trad('Sortie audio')}</span><select id="dev"><option value="">${trad('Sortie par défaut de Windows')}</option>${app.devices.map(d => `<option${d === dev ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
         ${tg(store.get('normalize', false), 'id="norm"', 'Normaliser le volume (ReplayGain des fichiers)')}
       </div></div>
-    <div class="card-box glass"><div class="row-head"><h2 style="margin:0">Égaliseur</h2>${tg(eq.enabled, 'id="eq-on"', eq.enabled ? 'Activé' : 'Désactivé')}</div>
-      <div class="muted" style="margin:6px 0 10px">S'applique aux fichiers de votre ordinateur. Les morceaux d'Apple Music sont protégés et ne peuvent pas être modifiés.</div>
-      <div class="chips">${Object.keys(EQ_PRESETS).map(n => `<span class="chip" data-p="${n}">${n}</span>`).join('')}</div>
+    <div class="card-box glass"><div class="row-head"><h2 style="margin:0">${trad('Égaliseur')}</h2>${tg(eq.enabled, 'id="eq-on"', eq.enabled ? 'Activé' : 'Désactivé')}</div>
+      <div class="muted" style="margin:6px 0 10px">${trad("S'applique aux fichiers de votre ordinateur. Les morceaux d'Apple Music sont protégés et ne peuvent pas être modifiés.")}</div>
+      <div class="chips">${Object.keys(EQ_PRESETS).map(n => `<span class="chip" data-p="${n}">${esc(trad(n))}</span>`).join('')}</div>
       <div class="eq">${eq.gains.map((g, i) => `<div class="band"><span>${g > 0 ? '+' : ''}${g}</span><input type="range" min="-12" max="12" step="1" value="${g}" data-b="${i}"><span>${FREQS[i]}</span></div>`).join('')}
-        <div class="band" style="margin-left:14px"><span>${eq.preamp}</span><input type="range" min="-12" max="12" step="1" value="${eq.preamp}" data-b="pre"><span>Gain</span></div></div></div>
-    <div class="card-box glass"><h2 style="margin-top:0">Minuterie de mise en veille</h2>
-      <div class="chips">${[['0', 'Désactivée'], ['15', '15 min'], ['30', '30 min'], ['45', '45 min'], ['60', '1 h'], ['end', 'Fin du morceau']].map(([k, l]) => `<span class="chip${(k === 'end' && sleep.endOfTrack) || (k === '0' && !sleep.until && !sleep.endOfTrack) ? ' on' : ''}" data-sl="${k}">${l}</span>`).join('')}</div>
-      ${sleepLeft ? `<div class="muted" style="margin-top:8px">Arrêt dans ${sleepLeft} min</div>` : ''}</div>
-    <div class="card-box glass"><h2 style="margin-top:0">Musique sur cet ordinateur</h2>
-      ${local.folders.map(f => `<div class="folder"><span title="${esc(f)}">${esc(f)}</span><button class="btn small" data-rm="${esc(f)}">Retirer</button></div>`).join('') || '<div class="muted">Aucun dossier pour l\'instant. Vous pouvez aussi glisser des dossiers dans la fenêtre.</div>'}
-      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn primary" id="addf">Ajouter un dossier</button><button class="btn" id="rescan">Réanalyser</button><span class="muted" id="scan-state" style="align-self:center">${local.tracks.length} morceaux</span></div></div>
-    <div class="card-box glass"><h2 style="margin-top:0">Application</h2><div class="stack">
+        <div class="band" style="margin-left:14px"><span>${eq.preamp}</span><input type="range" min="-12" max="12" step="1" value="${eq.preamp}" data-b="pre"><span>${trad('Gain')}</span></div></div></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Minuterie de mise en veille')}</h2>
+      <div class="chips">${[['0', 'Désactivée'], ['15', '15 min'], ['30', '30 min'], ['45', '45 min'], ['60', '1 h'], ['end', 'Fin du morceau']].map(([k, l]) => `<span class="chip${(k === 'end' && sleep.endOfTrack) || (k === '0' && !sleep.until && !sleep.endOfTrack) ? ' on' : ''}" data-sl="${k}">${trad(l)}</span>`).join('')}</div>
+      ${sleepLeft ? `<div class="muted" style="margin-top:8px">${trad('Arrêt dans {n} min', { n: sleepLeft })}</div>` : ''}</div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Musique sur cet ordinateur')}</h2>
+      ${local.folders.map(f => `<div class="folder"><span title="${esc(f)}">${esc(f)}</span><button class="btn small" data-rm="${esc(f)}">${trad('Retirer')}</button></div>`).join('') || `<div class="muted">${trad("Aucun dossier pour l'instant. Vous pouvez aussi glisser des dossiers dans la fenêtre.")}</div>`}
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn primary" id="addf">${trad('Ajouter un dossier')}</button><button class="btn" id="rescan">${trad('Réanalyser')}</button><span class="muted" id="scan-state" style="align-self:center">${tradn(local.tracks.length, '{n} morceau', '{n} morceaux')}</span></div></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Application')}</h2><div class="stack">
       ${tg(app.closeToTray, 'data-cfg="closeToTray"', 'Fermer la fenêtre garde la musique dans la zone de notification')}
       ${tg(app.autostart, 'data-cfg="autostart"', 'Lancer Pomme au démarrage du PC')}
       ${tg(store.get('onlineLyrics', true), 'id="olyr"', 'Chercher les paroles en ligne sur LRCLIB quand Apple n\'en fournit pas (envoie le titre et l\'artiste du morceau)')}
       ${tg(app.gpu, 'data-cfg="gpu"', 'Accélération graphique : défilement fluide à 144 Hz et plus (≈ 50 Mo de plus, au prochain lancement)')}
-    </div><div class="muted" style="margin-top:10px">Raccourcis : Espace lecture/pause · Ctrl+←/→ morceau précédent/suivant · ←/→ ±5 s · ↑/↓ volume · Ctrl+F rechercher · L paroles plein écran · M mini-lecteur · Échap fermer</div></div>
+    </div><div class="muted" style="margin-top:10px">${trad('Raccourcis : Espace lecture/pause · Ctrl+←/→ morceau précédent/suivant · ←/→ ±5 s · ↑/↓ volume · Ctrl+F rechercher · L paroles plein écran · M mini-lecteur · Échap fermer')}</div></div>
     <div class="card-box glass"><h2 style="margin-top:0">Discord</h2><div class="stack">
       ${tg(app.discord, 'data-cfg="discord"', 'Afficher le morceau en cours sur Discord (titre, artiste, pochette, progression ; effacé en pause)')}
-      <details class="muted"><summary style="cursor:pointer">Identifiant de votre application Discord</summary>
-        <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">ID d'application
-          <input id="dcid" class="field" inputmode="numeric" maxlength="24" placeholder="obligatoire pour activer le statut" value="${esc(app.discordId)}" style="width:220px"></label>
-        <div style="margin-top:6px">Le nom affiché (« Écoute … ») est celui de l'application sur <a id="dcdev" style="text-decoration:underline">discord.com/developers</a>.</div></details>
+      <details class="muted"><summary style="cursor:pointer">${trad('Identifiant de votre application Discord')}</summary>
+        <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">${trad("ID d'application")}
+          <input id="dcid" class="field" inputmode="numeric" maxlength="24" placeholder="${trad('obligatoire pour activer le statut')}" value="${esc(app.discordId)}" style="width:220px"></label>
+        <div style="margin-top:6px">${trad("Le nom affiché (« Écoute … ») est celui de l'application sur {lien}.", { lien: '<a id="dcdev" style="text-decoration:underline">discord.com/developers</a>' })}</div></details>
     </div></div>
-    <div class="card-box glass"><h2 style="margin-top:0">Compte</h2><button class="btn" id="acct">${apple.authorized ? 'Se déconnecter d\'Apple Music' : 'Se connecter à Apple Music'}</button></div>
-    <div class="card-box glass"><h2 style="margin-top:0">À propos</h2>
-      <div>Pomme ${esc(app.version)} — lecteur de musique libre (GPL-3.0), créé par <b>jeremdevgit</b>.</div>
-      <div class="muted">Pomme n'est ni affilié ni approuvé par Apple. Apple Music est une marque d'Apple Inc. Un abonnement Apple Music est nécessaire pour écouter son catalogue.</div>
-      <div class="muted">Paroles : Apple Music et <a id="lrclib" style="text-decoration:underline">LRCLIB</a>.</div></div>
-    <div class="card-box glass"><h2 style="margin-top:0">Mes autres logiciels</h2>
-      <div class="muted" style="margin-bottom:10px">Libres, gratuits et sans publicité. Chaque bouton ouvre la page de téléchargement officielle sur GitHub.</div>
-      <div class="stack">${MY_APPS.map((m, i) => `<div class="folder"><span><b>${esc(m.t)}</b> <span class="muted">· ${esc(m.os)} — ${esc(m.d)}</span></span><button class="btn small" data-app="${i}">Télécharger</button></div>`).join('')}</div>
-      <div style="margin-top:12px"><button class="btn" id="gh-profile">Tous mes logiciels sur GitHub</button></div></div>`;
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Compte')}</h2><button class="btn" id="acct">${trad(apple.authorized ? "Se déconnecter d'Apple Music" : 'Se connecter à Apple Music')}</button></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('À propos')}</h2>
+      <div>${trad('Pomme {version} — lecteur de musique libre (GPL-3.0), créé par <b>jeremdevgit</b>.', { version: esc(app.version) })}</div>
+      <div class="muted">${trad("Pomme n'est ni affilié ni approuvé par Apple. Apple Music est une marque d'Apple Inc. Un abonnement Apple Music est nécessaire pour écouter son catalogue.")}</div>
+      <div class="muted">${trad('Paroles : Apple Music et {lien}.', { lien: '<a id="lrclib" style="text-decoration:underline">LRCLIB</a>' })}</div></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Mes autres logiciels')}</h2>
+      <div class="muted" style="margin-bottom:10px">${trad('Libres, gratuits et sans publicité. Chaque bouton ouvre la page de téléchargement officielle sur GitHub.')}</div>
+      <div class="stack">${MY_APPS.map((m, i) => `<div class="folder"><span><b>${esc(m.t)}</b> <span class="muted">· ${esc(trad(m.os))} — ${esc(trad(m.d))}</span></span><button class="btn small" data-app="${i}">${trad('Télécharger')}</button></div>`).join('')}</div>
+      <div style="margin-top:12px"><button class="btn" id="gh-profile">${trad('Tous mes logiciels sur GitHub')}</button></div></div>`;
+    menusLangues(v);
     $('#eq-on').onclick = () => { eq.enabled = !eq.enabled; this.sendEq(); this.render(v); };
     $$('.chip[data-p]', v).forEach(c => c.onclick = () => { eq.gains = EQ_PRESETS[c.dataset.p].slice(); eq.enabled = true; this.sendEq(); this.render(v); });
     let t = 0;
@@ -1634,7 +1639,7 @@ const settings = {
     $('#norm').onclick = () => { store.set('normalize', !store.get('normalize', false)); this.render(v); };
     $$('.chip[data-sl]', v).forEach(c => c.onclick = () => { sleep.set(c.dataset.sl === 'end' ? 'end' : +c.dataset.sl); this.render(v); });
     $('#addf').onclick = () => native('local.addFolder');
-    $('#rescan').onclick = () => { native('local.rescan'); local.scanning = true; $('#scan-state').textContent = 'Analyse…'; };
+    $('#rescan').onclick = () => { native('local.rescan'); local.scanning = true; $('#scan-state').textContent = trad('Analyse…'); };
     $$('[data-rm]', v).forEach(b => b.onclick = () => native('local.removeFolder', { folder: b.dataset.rm }));
     $$('[data-cfg]', v).forEach(el => el.onclick = () => { const k = el.dataset.cfg; app[k] = !app[k]; native('config', { [k]: app[k] }); this.render(v); });
     $('#dcid').onchange = e => { const id = e.target.value.replace(/\D/g, '').slice(0, 24); e.target.value = id; app.discordId = id; native('config', { discordId: id }); toast(id ? 'Discord : application enregistrée' : 'Discord : application de Pomme rétablie'); };
@@ -1672,11 +1677,11 @@ window.pomme = {
         break;
       case 'dropped':
         for (const t of m.tracks || []) local.byId.set(t.id, t);
-        if (m.ids?.length) { player.playLocal(m.ids, 0); toast(m.ids.length > 1 ? `${m.ids.length} fichiers en lecture` : 'Lecture du fichier'); }
+        if (m.ids?.length) { player.playLocal(m.ids, 0); toast(m.ids.length > 1 ? trad('{n} fichiers en lecture', { n: m.ids.length }) : 'Lecture du fichier'); }
         break;
       case 'scanProgress':
         local.scanning = true;
-        { const s = $('#scan-state'); if (s) s.textContent = `Analyse… ${m.count} fichiers`; }
+        { const s = $('#scan-state'); if (s) s.textContent = trad('Analyse… {n} fichiers', { n: m.count }); }
         break;
       case 'local.loaded':
         player.dur = m.duration; ui.duration = m.duration; for (const e of $$('.t-dur')) e.textContent = fmtTime(m.duration);
@@ -1693,7 +1698,7 @@ window.pomme = {
         if (player.src === 'local') player.ended();
         break;
       case 'local.error':
-        toast(m.message);
+        toast(tradErr(m.message));
         if (player.src === 'local' && player.index < player.order.length - 1) setTimeout(() => player.next(), 800);
         break;
       case 'lyrics':
@@ -1802,4 +1807,4 @@ if (output.name) { native('audio.device', { name: output.name }); output.apply(f
 settings.sendEq();
 const appleReady = initApple();
 router.go(store.get('view', 'home'), null, false);
-requestAnimationFrame(() => native('ready'));
+requestAnimationFrame(() => native('ready', { lang: LANG }));

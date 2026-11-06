@@ -1,4 +1,33 @@
+# Security
+
+**English** · [Français](#sécurité)
+
+## Reporting a vulnerability
+
+Please **do not** open a public issue for a security flaw.
+Use GitHub's private reporting: the repository's **Security** tab → **Report a vulnerability**.
+Describe the problem, the version affected, the steps to reproduce it and, if possible, a suggested fix.
+You will get an answer as soon as possible; the fix will ship in a new release, crediting you if you agree.
+
+## Supported versions
+
+Only the latest release (*Releases* page) receives fixes.
+
+## What the software guarantees
+
+- No telemetry, no Pomme account; per-user install, without administrator rights.
+- Only Pomme's own interface pages can send commands to the program; navigation is limited to those pages and to Apple's sign-in.
+
+## Out of scope
+
+- The security of the Apple Music service and of Apple sign-in is Apple's responsibility.
+- The executable isn't signed with a paid certificate (SmartScreen warning): check the SHA-256 hash published with each release.
+
+---
+
 # Sécurité
+
+[English](#security) · **Français**
 
 ## Signaler une vulnérabilité
 

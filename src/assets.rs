@@ -17,6 +17,18 @@ mod icon;
 const INDEX: &str = include_str!("../ui/index.html");
 const STYLE: &str = include_str!("../ui/style.css");
 const APP: &str = include_str!("../ui/app.js");
+const LANGUE: &str = include_str!("../ui/langue.js");
+const CHARGEUR: &str = include_str!("../ui/textes-chargeur.js");
+// traductions : seule celle de la langue choisie est chargée
+const TEXTES: [(&str, &str); 7] = [
+    ("textes/en.js", include_str!("../ui/textes/en.js")),
+    ("textes/es.js", include_str!("../ui/textes/es.js")),
+    ("textes/de.js", include_str!("../ui/textes/de.js")),
+    ("textes/it.js", include_str!("../ui/textes/it.js")),
+    ("textes/pt.js", include_str!("../ui/textes/pt.js")),
+    ("textes/zh.js", include_str!("../ui/textes/zh.js")),
+    ("textes/ja.js", include_str!("../ui/textes/ja.js")),
+];
 
 pub fn icon_rgba(size: u32) -> Vec<u8> {
     icon::render_icon(size)
@@ -32,6 +44,12 @@ fn resolve(path: &str) -> Option<(Vec<u8>, &'static str, &'static str)> {
         "" | "index.html" => (INDEX.as_bytes().to_vec(), "text/html; charset=utf-8", no_cache),
         "style.css" => (STYLE.as_bytes().to_vec(), "text/css; charset=utf-8", no_cache),
         "app.js" => (APP.as_bytes().to_vec(), "text/javascript; charset=utf-8", no_cache),
+        "langue.js" => (LANGUE.as_bytes().to_vec(), "text/javascript; charset=utf-8", no_cache),
+        "textes-chargeur.js" => (CHARGEUR.as_bytes().to_vec(), "text/javascript; charset=utf-8", no_cache),
+        p if p.starts_with("textes/") => {
+            let (_, js) = TEXTES.iter().find(|(n, _)| *n == p)?;
+            (js.as_bytes().to_vec(), "text/javascript; charset=utf-8", no_cache)
+        }
         "icon.png" => (png(&icon::render_icon(128), 128), "image/png", "max-age=31536000"),
         _ => return None,
     })

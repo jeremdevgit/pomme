@@ -31,13 +31,13 @@ pub fn apply(hwnd: isize) {
 }
 
 /// Boîte de sélection d'un dossier (Explorateur Windows).
-pub fn pick_folder(owner: isize) -> Option<String> {
+pub fn pick_folder(owner: isize, titre: &str) -> Option<String> {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         let dlg: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
         let opts = dlg.GetOptions().ok()?;
         dlg.SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM).ok()?;
-        let title = HSTRING::from("Choisir un dossier de musique");
+        let title = HSTRING::from(titre);
         let _ = dlg.SetTitle(&title);
         dlg.Show(Some(HWND(owner as *mut _))).ok()?;
         let item = dlg.GetResult().ok()?;

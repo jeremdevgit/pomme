@@ -111,7 +111,7 @@ fn activity(v: &Value) -> Value {
         "status_display_type": 2,
         "details": field(&line),
         // l'album figure déjà sous la pochette (large_text)
-        "state": field(artist.or(album).unwrap_or("Artiste inconnu")),
+        "state": field(artist.or(album).unwrap_or(crate::langue::tr("Artiste inconnu"))),
         "assets": assets,
     });
     if dur > 0 {

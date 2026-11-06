@@ -77,17 +77,22 @@ pub fn run(mode: Mode, args: &[String]) {
                     }
                 };
                 match v["cmd"].as_str().unwrap_or("") {
-                    "init" => send(json!({
-                        "type": "init",
-                        "mode": if mode == Mode::Setup { "setup" } else { "maintenance" },
-                        "existing": install::installed_dir().is_some(),
-                        "existingVersion": install::installed_version(),
-                        "opts": Options::default(),
-                        "version": env!("CARGO_PKG_VERSION"),
-                        "glass": glass,
-                    })),
+                    "init" => {
+                        // langue de la page (celle de Windows) : titre de la fenêtre et inscriptions dans la même langue
+                        crate::langue::definir(v["lang"].as_str().unwrap_or("en"));
+                        window.set_title(crate::langue::tr(title));
+                        send(json!({
+                            "type": "init",
+                            "mode": if mode == Mode::Setup { "setup" } else { "maintenance" },
+                            "existing": install::installed_dir().is_some(),
+                            "existingVersion": install::installed_version(),
+                            "opts": Options::default(),
+                            "version": env!("CARGO_PKG_VERSION"),
+                            "glass": glass,
+                        }))
+                    }
                     "browse" => {
-                        if let Some(d) = crate::glass::pick_folder(window.hwnd() as isize) {
+                        if let Some(d) = crate::glass::pick_folder(window.hwnd() as isize, crate::langue::tr("Choisir le dossier d'installation")) {
                             let p = std::path::PathBuf::from(&d);
                             let d = if p.file_name().is_some_and(|n| n.eq_ignore_ascii_case("Pomme")) { p } else { p.join("Pomme") };
                             send(json!({ "type": "dir", "dir": d.to_string_lossy() }));

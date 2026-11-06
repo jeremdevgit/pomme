@@ -395,7 +395,7 @@ fn open_output(shared: Arc<Shared>, wanted: &Option<String>) -> Result<(cpal::St
             err,
             None,
         ),
-        other => return Err(format!("Format de sortie {other:?} non géré")),
+        other => return Err(format!("Format de sortie non géré : {other:?}")),
     }
     .map_err(|e| e.to_string())?;
     stream.play().map_err(|e| e.to_string())?;

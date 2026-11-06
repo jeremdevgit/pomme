@@ -15,6 +15,7 @@ mod config;
 mod discord;
 mod glass;
 mod install;
+mod langue;
 mod library;
 mod media;
 mod net;
@@ -126,13 +127,13 @@ fn make_tray() -> Option<tray_icon::TrayIcon> {
     }));
     let menu = Menu::new();
     let _ = menu.append_items(&[
-        &MenuItem::with_id("open", "Ouvrir Pomme", true, None),
+        &MenuItem::with_id("open", langue::tr("Ouvrir Pomme"), true, None),
         &PredefinedMenuItem::separator(),
-        &MenuItem::with_id("toggle", "Lecture / Pause", true, None),
-        &MenuItem::with_id("next", "Suivant", true, None),
-        &MenuItem::with_id("prev", "Précédent", true, None),
+        &MenuItem::with_id("toggle", langue::tr("Lecture / Pause"), true, None),
+        &MenuItem::with_id("next", langue::tr("Suivant"), true, None),
+        &MenuItem::with_id("prev", langue::tr("Précédent"), true, None),
         &PredefinedMenuItem::separator(),
-        &MenuItem::with_id("quit", "Quitter", true, None),
+        &MenuItem::with_id("quit", langue::tr("Quitter"), true, None),
     ]);
     let icon = tray_icon::Icon::from_rgba(assets::icon_rgba(32), 32, 32).ok();
     let mut b = TrayIconBuilder::new().with_tooltip("Pomme").with_menu(Box::new(menu)).with_menu_on_left_click(false);
@@ -295,6 +296,10 @@ fn main() {
                     test_log(&format!("ipc {}", msg.chars().take(120).collect::<String>()));
                 }
                 let Ok(v) = serde_json::from_str::<Value>(&msg) else { return };
+                // langue de l'interface : menu de la zone de notification et boîtes de Windows dans la même langue
+                if v["cmd"] == "ready" && langue::definir(v["lang"].as_str().unwrap_or("")) && tray.is_some() {
+                    tray = make_tray();
+                }
                 if v["cmd"] == "ready" && !shown {
                     // instance de test : fenêtre hors écran pour les captures
                     if let Ok(geo) = std::env::var("POMME_SHOW_AT") {
@@ -585,7 +590,7 @@ fn handle(
             }
         }
         "local.addFolder" => {
-            if let Some(dir) = glass::pick_folder(window.hwnd() as isize) {
+            if let Some(dir) = glass::pick_folder(window.hwnd() as isize, langue::tr("Choisir un dossier de musique")) {
                 {
                     let mut l = library.lock().unwrap();
                     if !l.folders.contains(&dir) {

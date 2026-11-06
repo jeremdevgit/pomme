@@ -165,7 +165,7 @@ pub fn install(o: &Options, step: &dyn Fn(&str)) -> Result<Vec<String>, String> 
     for (want, path) in [(o.desktop, desk), (o.start_menu, menu)] {
         let Some(path) = path else { continue };
         if want {
-            if !sys::create_shortcut(&path, &app, "", "Lecteur Apple Music et musique locale") {
+            if !sys::create_shortcut(&path, &app, "", crate::langue::tr("Lecteur Apple Music et musique locale")) {
                 notes.push(format!("Raccourci non créé : {}", path.display()));
             }
         } else {
@@ -188,7 +188,7 @@ pub fn install(o: &Options, step: &dyn Fn(&str)) -> Result<Vec<String>, String> 
     sys::reg_set_str(hk, k, "UninstallString", &m);
     sys::reg_set_str(hk, k, "ModifyPath", &m);
     sys::reg_set_str(hk, k, "QuietUninstallString", &format!("\"{}\" --uninstall", maint.display()));
-    sys::reg_set_str(hk, k, "Comments", "Lecteur Apple Music et musique locale, léger et fluide");
+    sys::reg_set_str(hk, k, "Comments", crate::langue::tr("Lecteur Apple Music et musique locale, léger et fluide"));
     sys::reg_set_dword(hk, k, "EstimatedSize", dir_size_kb(&dir));
     sys::reg_set_dword(hk, k, "NoRepair", 0);
     sys::reg_set_dword(hk, APP_KEY, "Desktop", o.desktop as u32);
