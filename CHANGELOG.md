@@ -1,5 +1,11 @@
 # Historique des versions
 
+## Maintenance CI — 2026-11-07
+
+- Actions GitHub épinglées à des SHA ; compilation en lecture seule, publication isolée avec droits limités et étiquette passée par variable d'environnement.
+- Pin GitHub Actions to commit SHAs; read-only build job and isolated publishing permissions, with release tag passed through an environment variable.
+- Application 0.3.0 inchangée. / Application 0.3.0 is unchanged.
+
 ## 0.3.0 — 2026-11-06
 
 **English**
