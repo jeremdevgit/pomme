@@ -214,7 +214,7 @@ pub fn create_shortcut(lnk: &Path, target: &Path, args: &str, description: &str)
     unsafe {
         CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32);
         let mut link: Raw = std::ptr::null_mut();
-        if CoCreateInstance(&CLSID_SHELL_LINK, std::ptr::null_mut(), CLSCTX_INPROC_SERVER, &IID_SHELL_LINK_W, &mut link) != 0 {
+        if CoCreateInstance(&CLSID_SHELL_LINK, std::ptr::null_mut(), CLSCTX_INPROC_SERVER, &IID_SHELL_LINK_W, &mut link) != 0 || link.is_null() {
             return false;
         }
         let vt = &**(link as *mut *const ShellLinkVtbl);
@@ -229,7 +229,7 @@ pub fn create_shortcut(lnk: &Path, target: &Path, args: &str, description: &str)
         (vt.set_icon_location)(link, t.as_ptr(), 0);
         let mut pf: Raw = std::ptr::null_mut();
         let mut ok = false;
-        if (vt.query_interface)(link, &IID_PERSIST_FILE, &mut pf) == 0 {
+        if (vt.query_interface)(link, &IID_PERSIST_FILE, &mut pf) == 0 && !pf.is_null() {
             let pvt = &**(pf as *mut *const PersistFileVtbl);
             if let Some(d) = lnk.parent() {
                 let _ = std::fs::create_dir_all(d);
