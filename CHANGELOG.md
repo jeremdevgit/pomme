@@ -1,5 +1,14 @@
 # Historique des versions
 
+## 0.3.1 — 2026-11-07 — Sécurité
+
+- Chargement des traductions à chemins constants, sorties COM contrôlées et Tokio 1.54.1. CI épinglée et publication isolée. Éditeur documenté.
+
+### English
+
+- Use constant translation paths, check COM outputs and update Tokio to 1.54.1; pin CI actions and isolate publication permissions. Document publisher identity.
+
+
 ## Maintenance CI — 2026-11-07
 
 - Actions GitHub épinglées à des SHA ; compilation en lecture seule, publication isolée avec droits limités et étiquette passée par variable d'environnement.
