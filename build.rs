@@ -11,11 +11,22 @@ fn main() {
     std::fs::write(&ico, ico_bytes(&[16, 20, 24, 32, 48, 64, 256])).unwrap();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut res = winres::WindowsResource::new();
+        // Cross-compilation depuis Linux : utiliser le compilateur MinGW du target.
+        if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("gnu") && cfg!(unix) {
+            res.set_windres_path("x86_64-w64-mingw32-windres");
+            res.set_ar_path("x86_64-w64-mingw32-ar");
+        }
         res.set_icon(ico.to_str().unwrap());
         res.set("ProductName", "Pomme");
-        res.set("FileDescription", "Pomme - lecteur Apple Music et musique locale");
+        res.set(
+            "FileDescription",
+            "Pomme - lecteur Apple Music et musique locale",
+        );
         res.set("CompanyName", "jeremdevgit");
-        res.set("LegalCopyright", "Copyright (C) 2026 jeremdevgit - logiciel libre sous licence GPL-3.0-or-later");
+        res.set(
+            "LegalCopyright",
+            "Copyright (C) 2026 jeremdevgit - logiciel libre sous licence GPL-3.0-or-later",
+        );
         res.set_manifest(
             r#"<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
 <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3"><security><requestedPrivileges>

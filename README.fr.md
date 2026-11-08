@@ -23,6 +23,8 @@
 
 <p><img src="captures/album.jpg" alt="Un album" width="49%"> <img src="captures/reglages.jpg" alt="Réglages : à propos et mes autres logiciels" width="49%"></p>
 
+La diffusion réseau exige Windows 11 et un appareil compatible sur le même réseau local. La connexion AirPlay à PIN et la lecture de contenu protégé ne sont pas garanties.
+
 ## Installer
 
 1. Télécharge `Pomme-Setup.exe` dans les [Releases](https://github.com/jeremdevgit/pomme/releases/latest) et lance-le.
@@ -35,7 +37,11 @@ L'exécutable n'est pas signé par un certificat payant : si Windows SmartScreen
 
 Prérequis : Windows 10 ou 11 avec le moteur WebView2 (présent d'office sur Windows 11).
 
+La diffusion réseau exige Windows 11 et un appareil compatible sur le même réseau local. La connexion AirPlay à PIN et la lecture de contenu protégé ne sont pas garanties.
+
 ## Vie privée et sécurité
+
+- La diffusion réseau démarre uniquement après sélection d’un appareil. Une adresse locale temporaire sert à transmettre le son de Pomme à cet appareil.
 
 - **Aucune télémétrie, aucun compte Pomme.** La connexion à Apple Music se fait sur la page officielle d'Apple ; la session reste dans le profil de Pomme sur ton PC.
 - **Services contactés** : Apple Music (catalogue, lecture, paroles), LRCLIB pour les paroles des morceaux locaux (titre et artiste envoyés, désactivable), Discord en local si le statut est activé.

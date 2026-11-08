@@ -14,7 +14,7 @@ const isAbort = e => {
   if (!e) return false;
   // les erreurs de MusicKit (MKError) portent le texte dans description ou errorCode
   const s = [e.name, e.message, e.description, e.errorCode, e.reason?.message, String(e)].filter(Boolean).join(' ');
-  return /AbortError|interrupt|abort|play\(\)|pause\(\)/i.test(s);
+  return /AbortError|interrupt|abort/i.test(s);
 };
 /** File de secours après « One or more items could not be resolved » :
  *  sans les identifiants cités par l'erreur, sinon avec le seul morceau choisi. */
@@ -55,6 +55,19 @@ function toast(msg) {
   const t = $('#toast'); t.textContent = trad(String(msg)); t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
 }
+
+// Préférences visuelles bornées : aucune feuille de style ni extension distante.
+const appearance = {
+  apply() {
+    const theme = store.get('theme', 'glass');
+    document.body.dataset.theme = ['glass', 'midnight', 'contrast'].includes(theme) ? theme : 'glass';
+    const size = Number(store.get('lyricSize', 100));
+    document.body.style.setProperty('--lyric-scale', Math.max(80, Math.min(130, Number.isFinite(size) ? size : 100)) / 100);
+    document.body.classList.toggle('less-motion', !!store.get('lessMotion', false));
+  },
+  reduced() { return !!store.get('lessMotion', false) || matchMedia('(prefers-reduced-motion: reduce)').matches; },
+};
+appearance.apply();
 
 // ── Apple Music ─────────────────────────────────────────────────────────
 /** Message d'erreur du moteur natif (« Fichier illisible : détail ») : traduit, détail conservé. */
@@ -233,13 +246,29 @@ const app = { closeToTray: true, autostart: false, gpu: true, discord: true, dis
 // ── lecteur unifié (Apple Music ou fichiers locaux) ─────────────────────
 const player = {
   src: null,                      // 'apple' | 'local'
-  volume: store.get('vol', 0.8),
+  volume: Number.isFinite(Number(store.get('vol', 0.8))) ? Math.max(0, Math.min(1, Number(store.get('vol', 0.8)))) : 0.8,
   shuffle: false,                 // désactivé à chaque lancement : seul le bouton l'active
   repeat: store.get('repeat', 0),  // 0 non, 1 une, 2 toutes
   playing: false,
   queue: [], order: [], index: -1,
-  pos: 0, posAt: 0, dur: 0, lastMedia: 0, seq: 0, lastTrack: null,
+  pos: 0, posAt: 0, dur: 0, lastMedia: 0, seq: 0, lastTrack: null, loadingApple: false,
 
+  appleTail: Promise.resolve(),
+  appleCommand(run) {
+    const task = this.appleTail.catch(() => {}).then(run);
+    this.appleTail = task.catch(() => {});
+    return task;
+  },
+  async resumeApple(seq) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (seq !== this.seq || this.src !== 'apple') return;
+      try { await apple.music.play(); return; }
+      catch (e) {
+        if (!isAbort(e) || attempt === 2) throw e;
+        await new Promise(r => setTimeout(r, 120 * (attempt + 1)));
+      }
+    }
+  },
   current() {
     if (this.src === 'apple') {
       const it = apple.music?.nowPlayingItem;
@@ -260,7 +289,7 @@ const player = {
     return 0;
   },
   stopOther(src) {
-    if (src !== 'apple' && this.src === 'apple' && apple.music) apple.music.stop()?.catch?.(() => { });
+    if (src !== 'apple' && this.src === 'apple' && apple.music) this.appleCommand(() => apple.music.stop()).catch(() => {});
     if (src !== 'local' && this.src === 'local') native('audio.stop');
   },
 
@@ -272,34 +301,42 @@ const player = {
     const seq = ++this.seq;
     this.stopOther('apple');
     this.src = 'apple';
-    for (let attempt = 0; ; attempt++) {
-      try {
-        // En aléatoire, MusicKit mélange la file avant de démarrer et ignore
-        // startWith : on ne mélange qu'une fois le morceau choisi lancé
-        // (il reste alors en tête). Sans morceau choisi (bouton Aléatoire),
-        // le mélange d'avant garde un départ au hasard.
-        apple.music.shuffleMode = this.shuffle && desc.startWith == null ? 1 : 0;
-        await apple.music.setQueue({ ...desc, startPlaying: true });
-        if (seq !== this.seq) return;
-        apple.music.shuffleMode = this.shuffle ? 1 : 0;
-        apple.music.repeatMode = this.repeat;
-        return seq;
-      } catch (e) {
-        if (seq !== this.seq || isAbort(e)) return;
-        const msg = String(e?.message || e);
-        log('playApple: ' + msg + ' ' + JSON.stringify(desc).slice(0, 400));
-        // Un morceau indisponible (retiré du catalogue, autre pays, import
-        // iCloud non résolu) fait échouer toute la file : on le retire et
-        // on relance, au pire avec le seul morceau choisi.
-        const next = attempt < 2 && unresolved(desc, msg, attempt);
-        if (next) { desc = next; continue; }
-        return toast(/resolv|not found|unavailable/i.test(msg) ? trad("Ce morceau n'est pas disponible sur Apple Music") : trad('Lecture impossible : {e}', { e: msg }));
+    this.loadingApple = true;
+    try { return await this.appleCommand(async () => {
+      if (seq !== this.seq || this.src !== 'apple') return;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          apple.music.shuffleMode = 0;
+          // setQueue(startPlaying:true) déclenche des play/pause internes concurrents.
+          // Construire la file, puis lancer une seule lecture, dans la même commande.
+          await apple.music.setQueue({ ...desc, startPlaying: false });
+          if (seq !== this.seq || this.src !== 'apple') return;
+          apple.music.repeatMode = this.repeat;
+          await this.resumeApple(seq);
+          if (seq !== this.seq || this.src !== 'apple') return;
+          // MusicKit ignore startWith si le mélange précède le premier play.
+          apple.music.shuffleMode = this.shuffle ? 1 : 0;
+          return seq;
+        } catch (e) {
+          if (seq !== this.seq || this.src !== 'apple') return;
+          const msg = String(e?.message || e?.description || e);
+          if (isAbort(e) && attempt < 2) {
+            await new Promise(r => setTimeout(r, 180 * (attempt + 1)));
+            continue;
+          }
+          log('playApple: ' + msg);
+          const next = attempt < 2 && !isAbort(e) && unresolved(desc, msg, attempt);
+          if (next) { desc = next; continue; }
+          toast(isAbort(e) ? 'Lecture interrompue. Réessayez avec Lecture.' : trad('Lecture impossible : {e}', { e: msg }));
+          return;
+        }
       }
-    }
+    }); } finally { if (seq === this.seq) this.loadingApple = false; }
   },
   playLocal(ids, start = 0) {
     if (!ids.length) return;
     this.seq++;
+    this.loadingApple = false;
     this.stopOther('local');
     this.src = 'local';
     this.queue = ids.slice();
@@ -320,14 +357,28 @@ const player = {
   },
   async toggle() {
     try {
-      if (this.src === 'apple') { apple.music.isPlaying ? await apple.music.pause() : await apple.music.play(); }
+      if (this.src === 'apple') {
+        const seq = this.seq;
+        const wantsPause = !this.loadingApple && !!apple.music.isPlaying;
+        await this.appleCommand(async () => {
+          if (seq !== this.seq || this.src !== 'apple') return;
+          if (wantsPause) { if (apple.music.isPlaying) await apple.music.pause(); }
+          else if (!apple.music.isPlaying) await this.resumeApple(seq);
+        });
+      }
       else if (this.src === 'local') native(this.playing ? 'audio.pause' : 'audio.play');
     } catch (e) { if (!isAbort(e)) toast(tradErr(e.message || String(e))); }
   },
-  pause() { if (this.playing) this.toggle(); },
+  pause() {
+    if (this.src === 'apple') {
+      const seq = this.seq;
+      return this.appleCommand(() => seq === this.seq && this.src === 'apple' ? apple.music.pause() : undefined).catch(e => log(e));
+    }
+    if (this.playing) native('audio.pause');
+  },
   async next() {
     try {
-      if (this.src === 'apple') return await apple.music.skipToNextItem();
+      if (this.src === 'apple') { const seq = this.seq; return await this.appleCommand(() => seq === this.seq && this.src === 'apple' && apple.music.skipToNextItem()); }
       if (this.src !== 'local') return;
       if (this.index < this.order.length - 1) { this.index++; this.loadLocal(true); }
       else if (this.repeat === 2) { this.index = 0; this.loadLocal(true); }
@@ -336,27 +387,34 @@ const player = {
   async prev() {
     try {
       if (this.position() > 4) return this.seek(0);
-      if (this.src === 'apple') return await apple.music.skipToPreviousItem();
+      if (this.src === 'apple') { const seq = this.seq; return await this.appleCommand(() => seq === this.seq && this.src === 'apple' && apple.music.skipToPreviousItem()); }
       if (this.src === 'local' && this.index > 0) { this.index--; this.loadLocal(true); }
       else if (this.src === 'local') this.seek(0);
     } catch (e) { if (!isAbort(e)) log(e); }
   },
   seek(t) {
     t = Math.max(0, t);
-    if (this.src === 'apple') apple.music.seekToTime(t)?.catch?.(() => { });
+    if (this.src === 'apple') { const seq = this.seq; this.appleCommand(() => seq === this.seq && this.src === 'apple' ? apple.music.seekToTime(t) : undefined).catch(() => {}); }
     else if (this.src === 'local') { native('audio.seek', { position: t }); this.pos = t; this.posAt = performance.now(); }
     ui.progress(t, true);
     lyrics.syncNow();
   },
   setVolume(v) {
+    if (!Number.isFinite(v)) return;
     this.volume = Math.max(0, Math.min(1, v)); store.set('vol', this.volume);
     if (apple.music) apple.music.volume = this.volume;
     native('audio.volume', { volume: this.volume });
-    const vol = $('#vol'); vol.value = this.volume; vol.style.setProperty('--v', this.volume * 100 + '%');
+    this.syncVolume();
+  },
+  syncVolume() {
+    for (const vol of $$('[data-volume]')) {
+      vol.value = vol.type === 'range' ? this.volume : Math.round(this.volume * 100);
+      vol.style.setProperty('--v', this.volume * 100 + '%');
+    }
   },
   setShuffle(on) {
     this.shuffle = on;
-    if (this.src === 'apple' && apple.music) apple.music.shuffleMode = on ? 1 : 0;
+    if (this.src === 'apple' && apple.music) this.appleCommand(() => { if (this.src === 'apple') apple.music.shuffleMode = this.shuffle ? 1 : 0; });
     if (this.src === 'local' && this.order.length) {
       const cur = this.order[this.index];
       if (on) this.shuffleOrder(cur); else this.order = this.queue.map((_, i) => i);
@@ -366,7 +424,7 @@ const player = {
   },
   setRepeat(r) {
     this.repeat = r; store.set('repeat', r);
-    if (apple.music) apple.music.repeatMode = r;
+    if (apple.music) this.appleCommand(() => { apple.music.repeatMode = this.repeat; });
     ui.modes();
   },
   ended() {
@@ -508,11 +566,16 @@ const session = {
     if (this.restored || player.src || !s || s.src !== 'apple' || !s.song) return;
     this.restored = true;
     try {
+      const seq = ++player.seq;
       player.src = 'apple';
-      await apple.music.setQueue({ song: s.song, startPlaying: false });
-      if (!player.current()) { player.src = null; ui.progress(0, true); return; }
-      player.onTrack();
-      if (s.pos > 5) { apple.music.seekToTime(s.pos)?.catch?.(() => { }); ui.progress(s.pos, true); }
+      await player.appleCommand(async () => {
+        if (seq !== player.seq || player.src !== 'apple') return;
+        await apple.music.setQueue({ song: s.song, startPlaying: false });
+        if (seq !== player.seq || player.src !== 'apple') return;
+        if (!player.current()) { player.src = null; ui.progress(0, true); return; }
+        player.onTrack();
+        if (s.pos > 5) { await apple.music.seekToTime(s.pos); ui.progress(s.pos, true); }
+      });
     } catch { if (!player.current()) { player.src = null; ui.progress(0, true); } }
   },
 };
@@ -703,7 +766,7 @@ function queueClick(e) {
   const q = e.target.closest('.qitem');
   if (!q) return false;
   const i = +q.dataset.i;
-  if (player.src === 'apple') apple.music.changeToMediaAtIndex(i)?.catch?.(() => { });
+  if (player.src === 'apple') player.appleCommand(() => player.src === 'apple' && apple.music.changeToMediaAtIndex(i)).catch(e => !isAbort(e) && toast(tradErr(e.message || String(e))));
   else if (player.src === 'local') { player.index = i; player.loadLocal(true); }
   return true;
 }
@@ -712,6 +775,32 @@ function queueChanged() {
   if (panel.view === 'queue') panel.render();
   if (fullscreen.on && fullscreen.tab === 'queue') fullscreen.renderTab();
 }
+
+// ── diffusion réseau, activée seulement par une action explicite ─────────
+const networkAudio = {
+  devices: [], state: 'stopped', scanning: false,
+  open() { $('#network-dialog').showModal(); },
+  render() {
+    const box = $('#network-devices');
+    box.innerHTML = this.devices.map((d, i) => `<button class="network-device glass" data-device="${i}"><span>${esc(d.name)}</span><small>${d.protocol === 'cast' ? 'Chromecast' : 'AirPlay'}</small></button>`).join('');
+    $$('[data-device]', box).forEach(b => b.onclick = () => native('network.start', { id: this.devices[+b.dataset.device].id }));
+    $('#network-scan').disabled = this.scanning;
+  },
+  receive(m) {
+    if (m.type === 'network.devices') {
+      this.devices = Array.isArray(m.devices) ? m.devices.slice(0, 64) : []; this.scanning = false;
+      $('#network-status').textContent = this.devices.length ? trad('Choisissez un appareil') : trad('Aucun appareil trouvé. Vérifiez le réseau et le pare-feu Windows.');
+      this.render(); return;
+    }
+    this.state = m.state;
+    if (m.state === 'error') this.scanning = false;
+    const text = m.state === 'connecting' ? trad('Connexion…') : m.state === 'streaming' ? trad('Diffusion active') : m.state === 'error' ? trad('Diffusion impossible') : trad('Diffusion arrêtée');
+    $('#network-status').textContent = text + (m.message ? ' · ' + String(m.message) : '');
+    $('#cast-btn').classList.toggle('on', m.state === 'streaming');
+    if (m.state === 'error' && !$('#network-dialog').open) toast(text);
+    this.render();
+  },
+};
 
 // ── paroles synchronisées ────────────────────────────────────────────────
 /* Chaque ligne : { t, e, text, words?: [{t, e, text}], bg?: [...] }.
@@ -769,7 +858,7 @@ const lyrics = {
     if (this.loading) { box.innerHTML = '<div class="spinner"></div>'; return; }
     if (!this.data?.lines?.length) { box.innerHTML = `<div class="empty">${trad('Paroles indisponibles pour ce morceau')}</div>`; return; }
     const d = this.data;
-    const words = ws => ws.map(w => `<span class="w">${esc(w.text)}</span>`).join('');
+    const words = ws => ws.map(w => `<span class="w" data-text="${esc(w.text)}">${esc(w.text)}</span>`).join('');
     box.innerHTML = `<div class="lyrics${d.plain ? ' plain' : ''}">` + d.lines.map((l, i) =>
       `<p class="l${l.words ? ' timed' : ''}${l.gap ? ' gap' : ''}" data-i="${i}">${l.words ? words(l.words) : esc(l.text || '♪')}${l.bg?.length ? `<span class="bgv">${words(l.bg)}</span>` : ''}</p>`).join('') +
       `<div class="src">${this.source ? esc(trad('Paroles : {source}', { source: this.source })) : ''}</div></div>`;
@@ -780,10 +869,11 @@ const lyrics = {
   /** Boucle d'affichage : seulement si les paroles sont visibles et que la musique joue. */
   tick() {
     if (this.raf || !this.box || !this.data || this.data.plain || !player.playing || document.hidden) return;
-    const step = () => {
+    let previousFrame = 0;
+    const step = now => {
       this.raf = 0;
       if (!this.box || !player.playing || document.hidden || !this.data) return;
-      this.sync(player.position() + 0.12);
+      if (now - previousFrame >= 30) { this.sync(player.position() + 0.12); previousFrame = now; }
       this.raf = requestAnimationFrame(step);
     };
     this.raf = requestAnimationFrame(step);
@@ -808,7 +898,7 @@ const lyrics = {
       if (p) {
         p.classList.remove('past'); p.classList.add('on');
         const box = this.box;
-        box.scrollTo({ top: p.offsetTop - box.clientHeight * 0.36, behavior: jump ? 'auto' : 'smooth' });
+        box.scrollTo({ top: p.offsetTop - box.clientHeight * 0.36, behavior: jump || appearance.reduced() ? 'auto' : 'smooth' });
       }
     }
     const line = L[i], p = this.els[i];
@@ -820,7 +910,12 @@ const lyrics = {
     for (let k = 0; k < all.length && k < spans.length; k++) {
       const w = all[k], s = spans[k];
       const state = t >= w.e ? 2 : t >= w.t ? 1 : 0;
-      if (state === 1) s.style.setProperty('--p', Math.round(((t - w.t) / Math.max(0.05, w.e - w.t)) * 100) + '%');
+      const percent = state === 2 ? 100 : state === 0 ? 0 : Math.max(0, Math.min(100, Math.round(((t - w.t) / Math.max(0.05, w.e - w.t)) * 100)));
+      // Pas de gradient transparent sur les glyphes : un masque révèle une copie blanche.
+      if (s.dataset.progress !== String(percent)) {
+        s.dataset.progress = percent;
+        s.style.setProperty('--p', percent + '%');
+      }
       if (st[k] !== state) {
         st[k] = state;
         s.classList.toggle('sung', state === 2);
@@ -831,7 +926,7 @@ const lyrics = {
   resetWords(i) {
     const p = this.els[i];
     if (!p) return;
-    for (const s of p.getElementsByClassName('w')) { s.classList.remove('sung', 'cur'); s.style.removeProperty('--p'); }
+    for (const s of p.getElementsByClassName('w')) { s.classList.remove('sung', 'cur'); s.style.removeProperty('--p'); delete s.dataset.progress; }
     this.wordState[i] = [];
   },
 };
@@ -945,31 +1040,62 @@ const localOf = t => ({ id: t.id, title: t.title, artist: t.artist, album: t.alb
 
 /** Liste de morceaux : en-tête, lignes virtuelles, lecture au double-clic.
  *  `opts.editable` : poignées de déplacement ; `opts.onReorder(items)`. */
+/** Filtrage local sans accents, stable, sans modifier l'ordre de la playlist. */
+function filterSongs(items, query = '', field = 'all', sort = '') {
+  const norm = x => String(x ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+  const terms = norm(query).trim().split(/\s+/).filter(Boolean);
+  const fields = ['title', 'artist', 'album'];
+  const keys = fields.includes(field) ? [field] : fields;
+  const out = terms.length ? items.filter(it => { const text = norm(keys.map(k => it[k] || '').join(' ')); return terms.every(t => text.includes(t)); }) : items.slice();
+  if (fields.includes(sort)) out.sort((x, y) => String(x[sort] || '').localeCompare(String(y[sort] || ''), undefined, { sensitivity: 'base', numeric: true }));
+  else if (sort === 'duration') out.sort((x, y) => (x.duration || 0) - (y.duration || 0));
+  return out;
+}
 function songTable(host, songs, onPlay, opts = {}) {
+  let controls = null, query = '', field = 'all', sort = '';
+  if (opts.filterable) {
+    controls = document.createElement('div'); controls.className = 'track-filters glass';
+    controls.innerHTML = `<input class="field" type="search" placeholder="${trad('Filtrer les morceaux')}" aria-label="${trad('Filtrer les morceaux')}">
+      <select data-field aria-label="${trad('Filtrer par')}">${[['all', 'Tout'], ['title', 'Titre'], ['artist', 'Artiste'], ['album', 'Album']].map(([k, l]) => `<option value="${k}">${trad(l)}</option>`).join('')}</select>
+      <select data-sort aria-label="${trad('Trier :')}">${[['', 'Ordre de la playlist'], ['title', 'Titre'], ['artist', 'Artiste'], ['album', 'Album'], ['duration', 'Durée']].map(([k, l]) => `<option value="${k}">${trad(l)}</option>`).join('')}</select>
+      <span class="muted" data-count role="status" aria-live="polite"></span>`;
+    host.appendChild(controls);
+  }
   host.insertAdjacentHTML('beforeend', `<div class="thead"><span></span><span></span><span>${trad('Titre')}</span><span class="art-c">${trad('Artiste')}</span><span class="alb">${trad('Album')}</span><span class="fmt">${trad('Format')}</span><span class="r">${trad('Durée')}</span><span></span></div>`);
   const head = host.lastElementChild;
-  const box = document.createElement('div');
-  host.appendChild(box);
+  const box = document.createElement('div'); host.appendChild(box);
   const list = vlist(box, songs, trackRow);
+  let all = songs;
+  const filtered = () => !!query.trim() || !!sort;
+  const refresh = () => {
+    list.update(filterSongs(all, query, field, sort));
+    box.classList.toggle('filtered', filtered());
+    if (controls) $('[data-count]', controls).textContent = list.items.length + ' / ' + all.length;
+  };
+  if (controls) {
+    $('input', controls).oninput = e => { query = e.target.value; refresh(); };
+    $('[data-field]', controls).onchange = e => { field = e.target.value; refresh(); };
+    $('[data-sort]', controls).onchange = e => { sort = e.target.value; refresh(); };
+  }
   if (opts.editable) box.classList.add('editable');
+  const sourceIndex = i => all.indexOf(list.items[i]);
   box.addEventListener('dblclick', e => { const r = e.target.closest('.trow'); if (r && !e.target.closest('.grip,.act')) onPlay(list.items, +r.dataset.i); });
   box.addEventListener('click', e => {
-    const r = e.target.closest('.trow');
-    if (!r) return;
-    if (e.target.closest('.act')) { opts.onRemove?.(+r.dataset.i); return; }
+    const r = e.target.closest('.trow'); if (!r) return;
+    if (e.target.closest('.act')) { opts.onRemove?.(sourceIndex(+r.dataset.i)); return; }
     if (e.target.closest('.art')) onPlay(list.items, +r.dataset.i);
   });
-  box.addEventListener('contextmenu', e => { const r = e.target.closest('.trow'); if (r) { e.preventDefault(); menu.song(e, list.items[+r.dataset.i], { ...opts, index: +r.dataset.i }); } });
-  if (opts.editable) dragReorder(box, list, opts);
-  list.box = box; list.head = head;
-  return list;
+  box.addEventListener('contextmenu', e => { const r = e.target.closest('.trow'); if (r) { e.preventDefault(); menu.song(e, list.items[+r.dataset.i], { ...opts, index: sourceIndex(+r.dataset.i) }); } });
+  if (opts.editable) dragReorder(box, list, { ...opts, onReorder(items) { all = items; refresh(); opts.onReorder?.(items); } });
+  refresh();
+  return { box, head, h: list.h, update(next) { all = next; refresh(); }, get items() { return all; }, get visible() { return list.items; } };
 }
 
 /** Glisser-déposer à la souris (poignée ⠿), avec défilement automatique. */
 function dragReorder(box, list, opts) {
   box.addEventListener('pointerdown', e => {
     const grip = e.target.closest('.grip');
-    if (!grip || e.button !== 0) return;
+    if (!grip || e.button !== 0 || box.classList.contains('filtered')) return;
     const row = grip.closest('.trow');
     const from = +row.dataset.i, h = list.h;
     const scroller = $('#main');
@@ -1016,7 +1142,7 @@ const playAppleSongs = async (items, i) => {
   const from = Math.max(0, i - 10), end = i + 100;
   const seq = await player.playApple({ songs: items.slice(from, end).map(queueId), startWith: i - from, startPosition: i - from });
   const rest = items.slice(end, end + 1500).map(queueId);
-  if (seq && seq === player.seq && rest.length) apple.music.playLater({ songs: rest }).catch(e => log('playLater: ' + (e?.message || e)));
+  if (seq && rest.length) await player.appleCommand(() => seq === player.seq && player.src === 'apple' && apple.music.playLater({ songs: rest })).catch(e => log('playLater: ' + (e?.message || e)));
 };
 const playLocalSongs = (items, i) => player.playLocal(items.map(s => s.id), i);
 /** Boutons « Aléatoire » des pages : une lecture mélangée, sans activer le
@@ -1085,8 +1211,8 @@ const menu = {
     }
     const id = s.catalogId || s.id;
     const items = [
-      ['Lire ensuite', () => apple.music.playNext({ song: id }).then(() => toast('Lu ensuite'), err => !isAbort(err) && toast('Impossible'))],
-      ['Lire plus tard', () => apple.music.playLater({ song: id }).then(() => toast('Ajouté à la file'), err => !isAbort(err) && toast('Impossible'))],
+      ['Lire ensuite', () => player.appleCommand(() => apple.music.playNext({ song: id })).then(() => toast('Lu ensuite'), err => !isAbort(err) && toast('Impossible'))],
+      ['Lire plus tard', () => player.appleCommand(() => apple.music.playLater({ song: id })).then(() => toast('Ajouté à la file'), err => !isAbort(err) && toast('Impossible'))],
     ];
     if (apple.authorized) {
       if (!String(s.type).startsWith('library')) items.push(['Ajouter à la bibliothèque', () => api(`/v1/me/library?ids[songs]=${id}`, { method: 'POST', cache: false }).then(() => toast('Ajouté à la bibliothèque'), () => toast('Échec de l\'ajout'))]);
@@ -1378,7 +1504,7 @@ async function playlistView(v, id, live) {
   const pl = r.data?.[0]; const a = pl?.attributes || {};
   const editable = lib && a.canEdit !== false && apple.authorized;
   v.innerHTML = `<div class="hero"><div class="cover">${img(artUrl(a.artwork, 230))}</div><div class="info"><div class="muted">${trad('Playlist')}</div><h1 id="pl-name">${esc(a.name)}</h1><div class="muted">${esc(a.curatorName || a.description?.standard || '')}</div><div class="muted" id="pl-count"></div><div class="actions"><button class="btn primary" id="pa">▶ ${trad('Lecture')}</button><button class="btn" id="sh">${trad('Aléatoire')}</button>${editable ? `<button class="btn" id="ed">✎ ${trad('Modifier')}</button>` : ''}</div></div></div><div id="pl-edit"></div><div id="pl-list"></div><div id="pl-sugg"></div>`;
-  const play = (items, i) => lib ? playAppleSongs(items, i) : player.playApple({ playlist: id, startWith: i, startPosition: i });
+  const play = (items, i) => playAppleSongs(items, i);
   let list = null, loaded = false;
   const st = { editing: false, name: a.name, added: 0, dirty: false };
   const count = () => { const d = list?.items.reduce((s, t) => s + (t.duration || 0), 0) || 0; $('#pl-count', v).textContent = tradn(list?.items.length || 0, '{n} morceau', '{n} morceaux') + ' · ' + fmtTime(d); };
@@ -1432,7 +1558,7 @@ async function playlistView(v, id, live) {
     if (!silent) toast('Playlist enregistrée');
   };
   const opts = {
-    editable,
+    filterable: true, editable,
     onReorder: () => {
       count();
       if (!loaded) { toast('Patientez, la playlist finit de se charger'); return router.render(); }
@@ -1448,8 +1574,8 @@ async function playlistView(v, id, live) {
     },
   };
   const path = lib ? `/v1/me/library/playlists/${id}/tracks?limit=100` : `/v1/catalog/${apple.sf}/playlists/${id}/tracks?limit=100`;
-  $('#pa', v).onclick = () => list?.items.length ? play(list.items, 0) : player.playApple({ playlist: id });
-  $('#sh', v).onclick = () => list?.items.length ? playAppleSongs(shuffled(list.items), 0) : player.playApple({ playlist: id });
+  $('#pa', v).onclick = () => list ? (list.visible.length && play(list.visible, 0)) : player.playApple({ playlist: id });
+  $('#sh', v).onclick = () => list ? (list.visible.length && playAppleSongs(shuffled(list.visible), 0)) : player.playApple({ playlist: id });
   $('#ed', v)?.addEventListener('click', () => toggleEdit());
 
   function toggleEdit() {
@@ -1582,6 +1708,11 @@ const settings = {
     v.innerHTML = `<h1>${trad('Réglages')}</h1>
     <div class="card-box glass"><h2 style="margin-top:0">${trad('Langue')}</h2>
       <div class="row-head" style="gap:10px"><span>${trad("Langue de l'interface")}</span><span data-langues></span></div></div>
+    <div class="card-box glass"><h2 style="margin-top:0">${trad('Apparence et confort')}</h2><div class="stack">
+      <label class="row-head">${trad('Thème')}<select id="theme">${[['glass', 'Verre'], ['midnight', 'Minuit'], ['contrast', 'Contraste élevé']].map(([k, label]) => `<option value="${k}"${document.body.dataset.theme === k ? ' selected' : ''}>${trad(label)}</option>`).join('')}</select></label>
+      <label class="row-head">${trad('Taille des paroles')}<select id="lyric-size">${[80, 100, 115, 130].map(n => `<option value="${n}"${+store.get('lyricSize', 100) === n ? ' selected' : ''}>${n}%</option>`).join('')}</select></label>
+      ${tg(store.get('lessMotion', false), 'id="less-motion"', 'Réduire les animations')}
+    </div></div>
     <div class="card-box glass"><h2 style="margin-top:0">${trad('Qualité de lecture')}</h2>
       <div class="muted">${trad("Apple Music — le lecteur web d'Apple ne délivre pas de lossless : 256 kb/s est le maximum possible.")}</div>
       <div class="chips" style="margin:10px 0 16px"><span class="chip${q === 'auto' ? ' on' : ''}" data-q="auto">${trad('Automatique')}</span><span class="chip${q === '256' ? ' on' : ''}" data-q="256">${trad('Haute qualité · AAC 256 kb/s')}</span><span class="chip${q === '64' ? ' on' : ''}" data-q="64">${trad('Économie de données · 64 kb/s')}</span></div>
@@ -1624,6 +1755,9 @@ const settings = {
       <div class="stack">${MY_APPS.map((m, i) => `<div class="folder"><span><b>${esc(m.t)}</b> <span class="muted">· ${esc(trad(m.os))} — ${esc(trad(m.d))}</span></span><button class="btn small" data-app="${i}">${trad('Télécharger')}</button></div>`).join('')}</div>
       <div style="margin-top:12px"><button class="btn" id="gh-profile">${trad('Tous mes logiciels sur GitHub')}</button></div></div>`;
     menusLangues(v);
+    $('#theme').onchange = e => { store.set('theme', e.target.value); appearance.apply(); };
+    $('#lyric-size').onchange = e => { store.set('lyricSize', +e.target.value); appearance.apply(); lyrics.recenter(); };
+    $('#less-motion').onclick = () => { store.set('lessMotion', !store.get('lessMotion', false)); appearance.apply(); this.render(v); };
     $('#eq-on').onclick = () => { eq.enabled = !eq.enabled; this.sendEq(); this.render(v); };
     $$('.chip[data-p]', v).forEach(c => c.onclick = () => { eq.gains = EQ_PRESETS[c.dataset.p].slice(); eq.enabled = true; this.sendEq(); this.render(v); });
     let t = 0;
@@ -1701,6 +1835,10 @@ window.pomme = {
         toast(tradErr(m.message));
         if (player.src === 'local' && player.index < player.order.length - 1) setTimeout(() => player.next(), 800);
         break;
+      case 'network.devices':
+      case 'network.status':
+        networkAudio.receive(m);
+        break;
       case 'lyrics':
         lyrics.receive(m);
         break;
@@ -1736,6 +1874,11 @@ function bind() {
   let st = 0;
   $('#q').addEventListener('input', e => { clearTimeout(st); st = setTimeout(() => router.go('search', e.target.value, router.view !== 'search'), 300); });
   $('#account').onclick = signIn;
+  $('#cast-btn').onclick = () => networkAudio.open();
+  $('#np-cast').onclick = () => networkAudio.open();
+  $('#network-close').onclick = () => $('#network-dialog').close();
+  $('#network-stop').onclick = () => native('network.stop');
+  $('#network-scan').onclick = () => { networkAudio.scanning = true; $('#network-status').textContent = trad('Recherche des appareils…'); networkAudio.render(); native('network.scan'); };
   $('#settings-btn').onclick = () => router.go('settings');
   $('#menu-btn').onclick = () => document.body.classList.toggle('drawer');
   $('#scrim').onclick = () => document.body.classList.remove('drawer');
@@ -1771,15 +1914,20 @@ function bind() {
   // changement de taille, d'orientation ou d'écran (l'échelle selon l'écran est réglée par Pomme côté natif)
   let rz = 0;
   addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => lyrics.recenter()); });
-  const vol = $('#vol');
-  vol.value = player.volume; vol.style.setProperty('--v', player.volume * 100 + '%');
-  vol.oninput = () => player.setVolume(+vol.value);
-  $('.vol').addEventListener('wheel', e => { e.preventDefault(); player.setVolume(player.volume - Math.sign(e.deltaY) * 0.05); }, { passive: false });
-  // fenêtre réduite : le curseur est masqué, l'icône l'ouvre au-dessus de la barre
-  $('.vol-ico').addEventListener('click', () => $('.vol').classList.toggle('open'));
-  addEventListener('pointerdown', e => { if (!e.target.closest('.vol')) $('.vol').classList.remove('open'); });
+  player.syncVolume();
+  for (const vol of $$('[data-volume]')) {
+    const update = () => { if (vol.value.trim() !== '') player.setVolume(vol.type === 'range' ? +vol.value : +vol.value / 100); };
+    vol.addEventListener(vol.type === 'range' ? 'input' : 'change', update);
+    if (vol.type === 'number') vol.addEventListener('keydown', e => { if (e.key === 'Enter') { update(); vol.blur(); } });
+  }
+  for (const box of $$('.vol')) {
+    box.addEventListener('wheel', e => { e.preventDefault(); player.setVolume(player.volume - Math.sign(e.deltaY) * 0.05); }, { passive: false });
+    $('.vol-ico', box)?.addEventListener('click', () => box.classList.toggle('open'));
+  }
+  addEventListener('pointerdown', e => { if (!e.target.closest('.vol')) $$('.vol.open').forEach(box => box.classList.remove('open')); });
   for (const bar of $$('.bar')) bar.addEventListener('click', e => { const r = bar.getBoundingClientRect(); const d = ui.duration || player.current()?.duration || 0; if (d) player.seek(((e.clientX - r.left) / r.width) * d); });
   addEventListener('keydown', e => {
+    if ($('#network-dialog').open) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
     if (e.key === 'Escape') { if (fullscreen.on) fullscreen.close(); else if (mini.on) mini.set(false); else menu.close(); }
     else if (e.code === 'Space') { e.preventDefault(); player.toggle(); }

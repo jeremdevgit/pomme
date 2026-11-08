@@ -37,8 +37,13 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
 
-      - name: Régressions de sécurité JavaScript
-        run: node tests/security-js.cjs
+      - name: Régressions de sécurité et lecture JavaScript
+        run: |
+          node tests/security-js.cjs
+          node tests/player-js.cjs
+
+      - name: Tests Rust (diffusion et sécurité des trames)
+        run: cargo test --locked
 
       - name: Compilation et contrôles (chemins, identifiants, Runtime Visual C++)
         run: ./tools/release.ps1 -Out dist -Ci

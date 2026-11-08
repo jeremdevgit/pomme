@@ -1,5 +1,23 @@
 # Historique des versions
 
+## 0.4.0 — 2026-11-08 — Lecture et diffusion réseau expérimentale
+
+- Paroles plein écran : remplissage blanc net des mots, 30 mises à jour maximum par seconde, taille réglable et mouvements réduits.
+- Volume 0–100 au clavier, curseurs synchronisés dans le lecteur et en plein écran.
+- Playlists : recherche par titre, artiste ou album et tri temporaire sans modifier les morceaux enregistrés.
+- MusicKit : commandes de lecture mises en file, reprise après une interruption transitoire et erreur visible si elle persiste.
+- Trois thèmes avec reflets statiques pour garder le défilement léger.
+- Diffusion AirPlay / Chromecast intégrée, sur demande et expérimentale : découverte locale, capture limitée à Pomme, tampon borné. Requiert Windows 11 ; association AirPlay temporaire uniquement ; dépend du support WAV du Chromecast et de la capture des contenus protégés par Windows. La compatibilité réelle avec les appareils reste à confirmer.
+
+### English
+
+- Clearer and smoother full-screen lyrics, configurable lyric size and reduced motion.
+- Numeric volume 0–100, including full screen.
+- Playlist title, artist and album filters with non-destructive sorting.
+- Serialized MusicKit playback and retries for transient play/pause interruptions.
+- Three lightweight visual themes.
+- Experimental, opt-in built-in AirPlay / Chromecast streaming on Windows 11; device compatibility and protected-content capture require hardware testing.
+
 ## 0.3.1 — 2026-11-07 — Sécurité
 
 - Chargement des traductions à chemins constants, sorties COM contrôlées et Tokio 1.54.1. CI épinglée et publication isolée. Éditeur documenté.

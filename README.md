@@ -23,6 +23,8 @@
 
 <p><img src="captures/en/album.jpg" alt="An album" width="49%"> <img src="captures/en/reglages.jpg" alt="Settings: about and my other software" width="49%"></p>
 
+Network streaming requires Windows 11 and a compatible receiver on the same LAN. AirPlay PIN pairing and protected-content playback are not guaranteed.
+
 ## Installing
 
 1. Download `Pomme-Setup.exe` from the [Releases](https://github.com/jeremdevgit/pomme/releases/latest) page and run it.
@@ -35,7 +37,11 @@ The executable isn't signed with a paid certificate: if Windows SmartScreen show
 
 Requirements: Windows 10 or 11 with the WebView2 runtime (built into Windows 11).
 
+Network streaming requires Windows 11 and a compatible receiver on the same LAN. AirPlay PIN pairing and protected-content playback are not guaranteed.
+
 ## Privacy and security
+
+- Network streaming starts only after you select a device. A temporary local address sends Pomme audio to that receiver.
 
 - **No telemetry, no Pomme account.** Signing in to Apple Music happens on Apple's official page; the session stays in Pomme's profile on your PC.
 - **Services contacted**: Apple Music (catalog, playback, lyrics), LRCLIB for local song lyrics (title and artist sent, can be turned off), Discord locally if the status is on.
