@@ -23,6 +23,8 @@
 
 <p><img src="captures/en/album.jpg" alt="Un álbum" width="49%"> <img src="captures/en/reglages.jpg" alt="Ajustes: acerca de y mis otros programas" width="49%"></p>
 
+La transmisión de red requiere Windows 11 y un receptor compatible en la misma red local. No se garantizan la asociación AirPlay con PIN ni la reproducción de contenido protegido.
+
 ## Instalar
 
 1. Descarga `Pomme-Setup.exe` desde la página [Releases](https://github.com/jeremdevgit/pomme/releases/latest) y ejecútalo.
@@ -35,7 +37,11 @@ El ejecutable no está firmado con un certificado de pago: si Windows SmartScree
 
 Requisitos: Windows 10 u 11 con el motor WebView2 (incluido en Windows 11).
 
+La transmisión de red requiere Windows 11 y un receptor compatible en la misma red local. No se garantizan la asociación AirPlay con PIN ni la reproducción de contenido protegido.
+
 ## Privacidad y seguridad
+
+- La transmisión de red solo se inicia al seleccionar un dispositivo. Una dirección local temporal envía el audio de Pomme al receptor.
 
 - **Sin telemetría ni cuenta de Pomme.** El inicio de sesión en Apple Music se hace en la página oficial de Apple; la sesión se queda en el perfil de Pomme en tu PC.
 - **Servicios contactados**: Apple Music (catálogo, reproducción, letras), LRCLIB para las letras de las canciones locales (se envían título y artista; se puede desactivar), Discord en local si el estado está activado.

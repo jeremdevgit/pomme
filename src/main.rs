@@ -19,6 +19,7 @@ mod langue;
 mod library;
 mod media;
 mod net;
+mod network_audio;
 mod setup;
 mod sys;
 
@@ -625,6 +626,9 @@ fn handle(
                 }
             }
         }
+        "network.scan" => network_audio::scan(),
+        "network.start" => network_audio::start(s("id")),
+        "network.stop" => network_audio::stop(),
         "audio.devices" => {
             let _ = proxy.send_event(UserEvent::ToUi(json!({ "type": "devices", "list": audio::devices() })));
         }
