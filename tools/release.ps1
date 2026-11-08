@@ -94,5 +94,6 @@ Check $exe $ids
 New-Item -ItemType Directory -Force $Out | Out-Null
 $setup = Join-Path $Out "$Name-Setup.exe"
 Copy-Item $exe $setup -Force
-"$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLower())  $Name-Setup.exe" | Set-Content (Join-Path $Out 'SHA256SUMS.txt') -Encoding ascii
+$hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+[System.IO.File]::WriteAllText((Join-Path $Out 'SHA256SUMS.txt'), "$hash  ${Name}-Setup.exe`n", [System.Text.Encoding]::ASCII)
 Write-Host "Livre dans $Out : $((Get-Item $setup).Length) octets, SHA-256 $((Get-FileHash $setup).Hash)"
