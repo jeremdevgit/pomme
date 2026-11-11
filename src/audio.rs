@@ -7,7 +7,9 @@
 //! processeur reste de l'ordre de 1 %.
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::audioadapter_buffers::direct::SequentialSliceOfVecs;
+use rubato::audioadapter_buffers::owned::InterleavedOwned;
+use rubato::{Async, FixedAsync, Indexing, Resampler, SincInterpolationParameters, SincInterpolationType, WindowFunction};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -171,7 +173,7 @@ struct Track {
     decoder: Box<dyn Decoder>,
     track_id: u32,
     rate: u32,
-    resampler: Option<SincFixedIn<f32>>,
+    resampler: Option<Async<f32>>,
     /// échantillons en attente du rééchantillonneur (par canal)
     pending: Vec<Vec<f32>>,
     eq: Eq,
@@ -235,15 +237,28 @@ fn open(path: &str, out_rate: u32, eq: &EqSettings) -> Result<(Track, AudioEvent
     ))
 }
 
-fn make_resampler(from: u32, to: u32) -> SincFixedIn<f32> {
+fn make_resampler(from: u32, to: u32) -> Async<f32> {
     let params = SincInterpolationParameters {
         sinc_len: 128,
-        f_cutoff: 0.95,
+        f_cutoff: Some(0.95),
         interpolation: SincInterpolationType::Linear,
         oversampling_factor: 128,
         window: WindowFunction::BlackmanHarris2,
     };
-    SincFixedIn::new(to as f64 / from as f64, 1.0, params, 1024, OUT_CH_STEREO).expect("rééchantillonneur")
+    Async::<f32>::new_sinc(to as f64 / from as f64, 1.0, &params, 1024, OUT_CH_STEREO, FixedAsync::Input).expect("rééchantillonneur")
+}
+
+/// Rééchantillonne un bloc stéréo planaire ; renvoie des trames entrelacées.
+/// `partial` : dernier bloc, plus court que demandé (complété par du silence).
+fn resample(rs: &mut Async<f32>, chunk: &[Vec<f32>], partial: bool) -> Option<Vec<f32>> {
+    let frames = chunk[0].len();
+    let input = SequentialSliceOfVecs::new(chunk, OUT_CH_STEREO, frames).ok()?;
+    let mut out = InterleavedOwned::new(0.0f32, OUT_CH_STEREO, rs.output_frames_max());
+    let indexing = partial.then(|| Indexing::new().partial_len(frames));
+    let (_, written) = rs.process_into_buffer(&input, &mut out, indexing.as_ref()).ok()?;
+    let mut data = out.take_data();
+    data.truncate(written * OUT_CH_STEREO);
+    Some(data)
 }
 
 impl Track {
@@ -298,19 +313,18 @@ impl Track {
 
     fn resample_ready(&mut self) -> Option<Vec<f32>> {
         let rs = self.resampler.as_mut()?;
-        let mut out: Vec<Vec<f32>> = vec![Vec::new(), Vec::new()];
+        let mut out: Vec<f32> = Vec::new();
         loop {
             let need = rs.input_frames_next();
             if self.pending[0].len() < need {
                 break;
             }
             let chunk: Vec<Vec<f32>> = self.pending.iter_mut().map(|c| c.drain(..need).collect()).collect();
-            if let Ok(r) = rs.process(&chunk, None) {
-                out[0].extend_from_slice(&r[0]);
-                out[1].extend_from_slice(&r[1]);
+            if let Some(r) = resample(rs, &chunk, false) {
+                out.extend_from_slice(&r);
             }
         }
-        (!out[0].is_empty()).then(|| interleave(&out))
+        (!out.is_empty()).then_some(out)
     }
 
     fn flush(&mut self) -> Option<Vec<f32>> {
@@ -320,7 +334,7 @@ impl Track {
         }
         let chunk = std::mem::take(&mut self.pending);
         self.pending = vec![Vec::new(), Vec::new()];
-        rs.process_partial(Some(&chunk), None).ok().map(|r| interleave(&r))
+        resample(rs, &chunk, true)
     }
 
     fn seek(&mut self, secs: f64) {
@@ -357,37 +371,37 @@ fn interleave(p: &[Vec<f32>]) -> Vec<f32> {
 pub fn devices() -> Vec<String> {
     let host = cpal::default_host();
     host.output_devices()
-        .map(|it| it.filter_map(|d| d.name().ok()).collect())
+        .map(|it| it.filter_map(|d| d.description().ok().map(|d| d.name().to_string())).collect())
         .unwrap_or_default()
 }
 
 fn default_name() -> Option<String> {
-    cpal::default_host().default_output_device().and_then(|d| d.name().ok())
+    cpal::default_host().default_output_device().and_then(|d| d.description().ok().map(|d| d.name().to_string()))
 }
 
 /// Ouvre la sortie ; renvoie aussi le nom du périphérique réellement utilisé.
 fn open_output(shared: Arc<Shared>, wanted: &Option<String>) -> Result<(cpal::Stream, u32, String), String> {
     let host = cpal::default_host();
-    let chosen = wanted.as_ref().and_then(|w| host.output_devices().ok()?.find(|d| d.name().ok().as_deref() == Some(w.as_str())));
+    let chosen = wanted.as_ref().and_then(|w| host.output_devices().ok()?.find(|d| d.description().ok().is_some_and(|d| d.name() == w.as_str())));
     let device = chosen.or_else(|| host.default_output_device()).ok_or("Aucune sortie audio")?;
-    let name = device.name().unwrap_or_default();
+    let name = device.description().map(|d| d.name().to_string()).unwrap_or_default();
     let supported = device.default_output_config().map_err(|e| e.to_string())?;
     let fmt = supported.sample_format();
     let config: cpal::StreamConfig = supported.into();
     let out_ch = config.channels as usize;
-    let rate = config.sample_rate.0;
+    let rate = config.sample_rate;
     let lost = shared.clone();
     let err = move |_| lost.lost.store(true, Ordering::Relaxed);
     let sh = shared.clone();
     let stream = match fmt {
         cpal::SampleFormat::F32 => device.build_output_stream(
-            &config,
+            config,
             move |out: &mut [f32], _| write_out(&sh, out_ch, out.len(), |i, v| out[i] = v),
             err,
             None,
         ),
         cpal::SampleFormat::I16 => device.build_output_stream(
-            &config,
+            config,
             move |out: &mut [i16], _| {
                 let n = out.len();
                 write_out(&sh, out_ch, n, |i, v| out[i] = (v.clamp(-1.0, 1.0) * 32767.0) as i16)
