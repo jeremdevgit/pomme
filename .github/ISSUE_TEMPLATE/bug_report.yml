@@ -1,0 +1,19 @@
+name: Bug report / Signaler un bug
+description: Something does not work as expected / Quelque chose ne fonctionne pas
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Que s'est-il passé ?
+      description: Steps to reproduce, expected and actual behavior. / Étapes, résultat attendu et obtenu.
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Version and system / Version et système
+      placeholder: "e.g. 1.2.0 on Windows 11 / macOS 15"
+    validations: { required: true }
+  - type: markdown
+    attributes:
+      value: "Please do not post personal data or secrets. For a security flaw, use the **Security** tab (private reporting). / Pas de données personnelles ni de secrets. Faille de sécurité : onglet **Security** (signalement privé)."
