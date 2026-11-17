@@ -45,7 +45,7 @@ panic = "unwind"
 strip = true
 
 [target.'cfg(windows)'.dependencies]
-mdns-sd = "0.17"
+mdns-sd = "0.21"
 cidermill-airplay = "=0.1.5"
 wasapi = "0.27"
 native-tls = "0.2"
