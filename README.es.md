@@ -1,98 +1,79 @@
-<p align="center"><img src="captures/icone.png" width="96" alt=""></p>
+<p align="center"><img src="captures/icone.png" width="112" alt=""></p>
 
-# Pomme
+<h1 align="center">Pomme</h1>
 
-[English](README.md) · [Français](README.fr.md) · **Español**
+<p align="center"><b>Un reproductor ligero para Apple Music y tus archivos de audio: letras, ecualizador, minirreproductor.</b></p>
 
-**Un reproductor de música ligero para Windows: Apple Music y tus archivos de audio locales en la misma ventana.** Biblioteca, playlists, letras sincronizadas, ecualizador, minirreproductor, teclas multimedia, estado de Discord — en una aplicación de unos diez megabytes, sin Electron.
+<p align="center"><img src="https://img.shields.io/badge/%F0%9F%8E%AE%20Music%20%26%20games-Windows-c2410c?style=flat-square" alt="Música y juegos"> <a href="https://github.com/jeremdevgit/pomme/releases"><img src="https://img.shields.io/github/v/release/jeremdevgit/pomme?include_prereleases&style=flat-square&label=version" alt="version"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-555?style=flat-square" alt="GPL-3.0-or-later"></a> <a href="https://github.com/jeremdevgit/pomme/actions/workflows/windows.yml"><img src="https://github.com/jeremdevgit/pomme/actions/workflows/windows.yml/badge.svg" alt="CI"></a></p>
 
-**8 idiomas**: español, inglés, francés, alemán, italiano, portugués, chino y japonés. El idioma de Windows se elige automáticamente; *Ajustes › Idioma* permite cambiarlo (el menú del área de notificación también cambia).
+<p align="center"><a href="README.md">English</a> · <a href="README.fr.md">Français</a> · <b>Español</b> · <a href="README.de.md">Deutsch</a> · <a href="README.it.md">Italiano</a> · <a href="README.pt.md">Português</a> · <a href="README.zh.md">简体中文</a> · <a href="README.ja.md">日本語</a></p>
 
-👉 **[Descargar Pomme para Windows](https://github.com/jeremdevgit/pomme/releases/latest)** (`Pomme-Setup.exe`)
+<p align="center"><a href="https://github.com/jeremdevgit/pomme/releases/latest"><b>⬇ Descargar</b></a></p>
 
 ![Álbumes locales y el reproductor](captures/en/albums.jpg)
 
+Apple Music y tus propios archivos de audio en la misma ventana, en una app de unos diez megabytes, **sin Electron**.
+
+## De un vistazo
+
+| | |
+|---|---|
+| **Categoría** | 🎮 Música y juegos |
+| **Plataformas** | Windows |
+| **Interfaz** | 8 idiomas (EN, FR, ES, DE, IT, PT, ZH, JA) |
+| **Precio** | Gratis, de código abierto, sin anuncios ni telemetría |
+| **Estado** | Estable |
+| **Licencia** | [GPL-3.0-or-later](LICENSE) |
+
 ## Funciones
 
-- **Apple Music** (se necesita suscripción): Escuchar ahora, Explorar, Radio, tu biblioteca y tus playlists, búsqueda, creación de playlists.
-- **Música del ordenador**: FLAC, ALAC, MP3, AAC/M4A, Ogg Vorbis, WAV, AIFF, CAF, MKA… con portadas, álbumes y artistas; arrastrar y soltar carpetas o archivos; reproducción en alta resolución (el formato se muestra durante la reproducción).
-- **Letras sincronizadas** a pantalla completa (Apple Music, o LRCLIB para las canciones locales; se puede desactivar).
-- **Ecualizador** de 10 bandas con preajustes, normalización del volumen, elección de la salida de audio, calidad de reproducción ajustable.
-- **Minirreproductor**, temporizador de apagado, teclas multimedia y controles de Windows, área de notificación, inicio con el PC.
-- **Estado de Discord** («Escuchando…») con título, artista, portada y progreso, si lo deseas.
+- **Apple Music** (requiere suscripción): Escuchar, Explorar, Radio, tu biblioteca y listas, búsqueda, creación de listas.
+- **Tus archivos**: FLAC, ALAC, MP3, AAC/M4A, Ogg Vorbis, WAV, AIFF, CAF, MKA… con carátulas, álbumes y artistas; arrastrar y soltar; reproducción en alta resolución.
+- **Letras sincronizadas** a pantalla completa (Apple Music, o LRCLIB para canciones locales; se puede desactivar).
+- **Ecualizador** de 10 bandas con preajustes, normalización de volumen, elección de salida de audio, calidad de reproducción.
+- **Minirreproductor**, temporizador, teclas multimedia y controles de Windows, área de notificación, inicio con Windows.
+- **Estado de Discord** y **transmisión por red** a un receptor compatible de la misma red (Windows 11), si quieres.
 
-<p><img src="captures/en/album.jpg" alt="Un álbum" width="49%"> <img src="captures/en/reglages.jpg" alt="Ajustes: acerca de y mis otros programas" width="49%"></p>
+<p><img src="captures/en/album.jpg" alt="Un álbum" width="49%"> <img src="captures/en/reglages.jpg" alt="Ajustes" width="49%"></p>
 
-La transmisión de red requiere Windows 11 y un receptor compatible en la misma red local. No se garantizan la asociación AirPlay con PIN ni la reproducción de contenido protegido.
+## Para empezar
 
-## Instalar
+1. Descarga `Pomme-Setup.exe` de la [última versión](https://github.com/jeremdevgit/pomme/releases/latest) y ejecútalo. Pomme se instala **para tu cuenta, sin permisos de administrador**, y reemplaza una versión anterior conservando biblioteca, ajustes y sesión de Apple Music.
+2. Inicia sesión en Apple Music en la página oficial de Apple, o suelta tus carpetas de música en la ventana.
+3. Desinstala desde *Configuración › Aplicaciones*, conservando o borrando tu biblioteca.
 
-1. Descarga `Pomme-Setup.exe` desde la página [Releases](https://github.com/jeremdevgit/pomme/releases/latest) y ejecútalo.
-2. Pomme se instala **para tu cuenta de Windows, sin permisos de administrador**. **Una versión ya instalada se sustituye automáticamente**: se conservan la biblioteca, los ajustes y la sesión de Apple Music.
-3. Para desinstalar: *Configuración › Aplicaciones* (a elegir: conservar o borrar biblioteca y ajustes).
+Requisitos: Windows 10 u 11 con WebView2 (incluido en Windows 11). Sin certificado de pago: si aparece SmartScreen, elige **Más información › Ejecutar de todas formas**. Comprueba con `Get-FileHash` y `SHA256SUMS.txt`. Instalación silenciosa: `Pomme-Setup.exe /S`.
 
-<img src="captures/en/installateur.jpg" alt="Instalador: actualización sobre la versión anterior" width="40%">
+## Privacidad
 
-El ejecutable no está firmado con un certificado de pago: si Windows SmartScreen muestra «Windows protegió su PC», haz clic en **Más información** y luego en **Ejecutar de todas formas**. Para comprobar el archivo: `Get-FileHash .\Pomme-Setup.exe` y compáralo con `SHA256SUMS.txt`. Instalación silenciosa: `Pomme-Setup.exe /S`.
-
-Requisitos: Windows 10 u 11 con el motor WebView2 (incluido en Windows 11).
-
-La transmisión de red requiere Windows 11 y un receptor compatible en la misma red local. No se garantizan la asociación AirPlay con PIN ni la reproducción de contenido protegido.
-
-## Privacidad y seguridad
-
-- La transmisión de red solo se inicia al seleccionar un dispositivo. Una dirección local temporal envía el audio de Pomme al receptor.
-
-- **Sin telemetría ni cuenta de Pomme.** El inicio de sesión en Apple Music se hace en la página oficial de Apple; la sesión se queda en el perfil de Pomme en tu PC.
-- **Servicios contactados**: Apple Music (catálogo, reproducción, letras), LRCLIB para las letras de las canciones locales (se envían título y artista; se puede desactivar), Discord en local si el estado está activado.
-- La interfaz solo acepta órdenes de sus propias páginas; los enlaces externos se abren en tu navegador.
-- Pomme no incluye ninguna clave de Apple: como el reproductor web de Apple Music, usa el token público que publica music.apple.com.
-
-¿Has encontrado una vulnerabilidad? Lee [SECURITY.md](SECURITY.md).
+- **Sin telemetría ni cuenta de Pomme.** Tu sesión de Apple Music se queda en el perfil de Pomme en tu PC.
+- Servicios contactados: Apple Music; LRCLIB para letras locales (solo título y artista, desactivable); Discord en local si el estado está activado. La transmisión por red solo empieza tras elegir un dispositivo.
+- Pomme no incluye ninguna clave de Apple: como el reproductor web de Apple, usa el token público publicado por music.apple.com.
 
 ## Compilar
 
-Requisitos: [Rust](https://rustup.rs) estable y las *Build Tools* de Visual Studio («Desarrollo para el escritorio con C++»).
-
 ```powershell
-cargo build --release          # target\release\Pomme.exe (renombrado Pomme-Setup.exe, instala)
-.\tools\release.ps1            # dist\Pomme-Setup.exe + comprobaciones (sin rutas ni identificadores de la máquina, sin dependencia del Runtime de Visual C++)
+# Rust estable + Visual Studio Build Tools (C++)
+cargo build --release        # target\release\Pomme.exe
+.\tools\release.ps1          # dist\Pomme-Setup.exe + comprobaciones
 ```
 
-Las versiones publicadas las construye GitHub Actions ([`.github/workflows/windows.yml`](.github/workflows/windows.yml)).
-
-## Traducciones
-
-La interfaz elige su idioma (elección guardada, si no idioma de Windows, si no inglés) y se traduce una vez al cargarse. Los textos están en `ui/textes/<idioma>.js`, donde el texto francés sirve de clave; solo se carga el idioma elegido. Los pocos textos que muestra el propio Windows (menú del área de notificación, selector de carpeta, instalador) están en `src/langue.rs` y `ui/setup.html`.
-
-## Estructura del repositorio
-
-```
-src/          programa (Rust): ventana WebView2, reproducción de audio (symphonia, cpal), biblioteca local, instalador
-ui/           interfaz (HTML, CSS, JavaScript sin framework); ui/textes: traducciones
-tools/        construcción de la versión distribuida
-captures/     capturas de pantalla (biblioteca ficticia de obras de dominio público; captures/en: interfaz en inglés)
-```
+Las traducciones están en `ui/textes/<idioma>.js` (texto francés como clave). Las versiones se compilan con GitHub Actions ([`windows.yml`](.github/workflows/windows.yml)).
 
 ## Licencia
 
-Código bajo licencia **GNU GPL v3 o posterior**: consulta [LICENSE](LICENSE). Copyright © 2026 jeremdevgit.
+GNU GPL v3 o posterior — ver [LICENSE](LICENSE). Pomme no está afiliado ni respaldado por Apple; Apple Music es una marca de Apple Inc. Las bibliotecas Rust (symphonia, cpal, wry, tao…) son MIT / Apache-2.0 / MPL-2.0.
 
-Pomme no está afiliado ni respaldado por Apple. Apple Music es una marca de Apple Inc. Las bibliotecas de Rust utilizadas (symphonia, cpal, wry, tao…) están bajo licencias MIT / Apache-2.0 / MPL-2.0; la lista completa figura en `Cargo.lock`.
+---
 
-## Mis otros programas
+¿Has encontrado una vulnerabilidad? Infórmala en privado (consulta [SECURITY.md](SECURITY.md)) y no en una incidencia pública.
 
-Todos libres, gratuitos y sin publicidad — [github.com/jeremdevgit](https://github.com/jeremdevgit):
+## Más software libre de jeremdevgit
 
-| Programa | Plataforma | En resumen |
-|---|---|---|
-| [AutoDex](https://github.com/jeremdevgit/autodex) | Windows, macOS, Linux | Juego de colección de coches con reconocimiento de fotos en el dispositivo |
-| [Boîte à outils](https://github.com/jeremdevgit/boite-a-outils) | Windows, macOS | Mantenimiento del ordenador, limpieza y búsqueda de archivos |
-| [Carnet de notes](https://github.com/jeremdevgit/carnet-rust) | Windows | Cuadernos cifrados y sincronización experimental |
-| [Decklight](https://github.com/jeremdevgit/decklight) | Windows, macOS, Linux | Stream Deck virtual con control USB |
-| [JMeca](https://github.com/jeremdevgit/jmeca) | Windows, macOS, Linux | Seguimiento de mantenimiento de vehículos cifrado |
-| [LJ Hub](https://github.com/jeremdevgit/lj-hub) | Windows, macOS, Linux | Gestor de perfiles para dispositivos Logitech |
-| [rJb](https://github.com/jeremdevgit/rjb) | Windows | Control de la iluminación RGB |
-| [Ludothèque](https://github.com/jeremdevgit/ludotheque) | macOS | Biblioteca y lanzador de juegos |
-| [Suite Libre](https://jeremdevgit.github.io/suite-libre/) | Navegador | Seis herramientas sin cuenta |
-| [Batailles de France](https://github.com/jeremdevgit/batailles-de-france) | Navegador | Juego de estrategia en tiempo real |
+Todos gratuitos, de código abierto y sin anuncios.
+
+**🛠️ Sistema y hardware** — [Boîte à outils](https://github.com/jeremdevgit/boite-a-outils) · [rJb](https://github.com/jeremdevgit/rjb) · [LJ Hub](https://github.com/jeremdevgit/lj-hub) · [Decklight](https://github.com/jeremdevgit/decklight)
+
+**📒 Productividad y datos** — [Carnet de notes](https://github.com/jeremdevgit/carnet-rust) · [JMeca](https://github.com/jeremdevgit/jmeca) · [Suite Libre](https://jeremdevgit.github.io/suite-libre/)
+
+**🎮 Música y juegos** — [Ludothèque](https://github.com/jeremdevgit/ludotheque) · [AutoDex](https://github.com/jeremdevgit/autodex) · [Batailles de France](https://github.com/jeremdevgit/batailles-de-france)
