@@ -25,7 +25,7 @@ windows = { version = "0.62", features = [
 symphonia = { version = "0.5", default-features = false, features = ["flac", "alac", "mp1", "mp2", "mp3", "aac", "adpcm", "isomp4", "mkv", "caf", "wav", "pcm", "ogg", "vorbis", "aiff"] }
 cpal = "0.18"
 rubato = "5"
-lofty = "0.22"
+lofty = "0.25"
 souvlaki = "0.9"
 ureq = "2"
 serde = { version = "1", features = ["derive"] }
